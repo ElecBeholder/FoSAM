@@ -28,7 +28,7 @@ from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
-task_name = '10ViTPixelwise+temperature2+weight 2,1:'
+task_name = '10ViTPixelwise+temperature2+weight2,1'
 
 system = platform.system()
 if system == "Windows":
@@ -262,7 +262,7 @@ class EmbeddingClassificationLoss(nn.Module):
                 # 获取预测和真实类别
                 pred_class = torch.argmax(predictions[b]).item()
                 true_class = class_label[b].item()
-                all_score4true = all_embeddings_predictions[b][:, true_class].view(40, 40)
+                all_score4true = F.softmax(all_embeddings_predictions[b], dim=1)[:, true_class].view(40, 40)
 
                 # 可视化预测的 saliency map
                 if hasattr(model.image_encoder.segmentation_module, 'xs') and model.image_encoder.segmentation_module.xs is not None:
@@ -588,7 +588,7 @@ if __name__ == '__main__':
                     seg_loss = diceloss(pred_bx1KxHxW, label_bxHxW)
                     
                     lambda_embedding = 2  # 可以根据需要调整权重
-                    lambda_regularization = 1 # 可以根据需要调整权重
+                    lambda_regularization = 0 # 可以根据需要调整权重
                     
                     loss = seg_loss + lambda_embedding * embedding_classification_loss + lambda_regularization * loss_regularization
                     if torch.isnan(loss):
