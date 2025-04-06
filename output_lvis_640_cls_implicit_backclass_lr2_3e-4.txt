@@ -1,0 +1,93 @@
+
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.594776     0.20451    0.985041    0.174284  0.579662
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.708015    0.427724    0.988306    0.180591  0.584449
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.710102    0.431925    0.988279    0.181702  0.584991
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.703029    0.417418    0.988639    0.180488  0.584564
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713423    0.438549    0.988296    0.181678  0.584987
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.711304    0.434395    0.988213    0.182425  0.585319
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713862    0.438964    0.988759    0.183633  0.586196
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714017    0.439674     0.98836    0.181748  0.585054
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.711157     0.43409    0.988225    0.181828  0.585027
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714216    0.440205    0.988227     0.18261  0.585419
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.715049    0.441198      0.9889    0.182189  0.585544
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.715436    0.442237    0.988635    0.181371  0.585003
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714851     0.44143    0.988273    0.181533  0.584903
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.712853    0.437082    0.988625     0.18172  0.585173
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.715181    0.441837    0.988525    0.181369  0.584947
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716394    0.444469    0.988318    0.181591  0.584955
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.715489     0.44233    0.988647     0.18176  0.585204
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716509    0.444435    0.988583    0.182053  0.585318
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716359    0.444206    0.988513    0.183109  0.585811
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716411      0.4444    0.988423    0.182521  0.585472
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716083    0.443487     0.98868    0.181826  0.585253
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716759    0.445228    0.988289    0.183074  0.585682
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717309    0.446051    0.988567     0.18232  0.585444
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717492    0.446309    0.988674    0.182406   0.58554
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717057    0.445642    0.988472    0.181067  0.584769
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716156    0.443603    0.988708    0.183007  0.585857
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717075    0.445699     0.98845    0.180935  0.584692
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717362    0.446564     0.98816    0.180763  0.584461
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.715788    0.443627     0.98795    0.181666  0.584808
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717021     0.44583    0.988211    0.181277  0.584744
+
+lr2 = 3e-4

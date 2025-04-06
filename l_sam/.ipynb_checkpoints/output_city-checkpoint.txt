@@ -1,0 +1,153 @@
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.630729    0.330077    0.931381
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.694495    0.429777    0.959214
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.695591    0.432338    0.958843
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.696822    0.431777    0.961867
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.701016    0.441063     0.96097
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.703428    0.446573    0.960284
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.704191     0.44712    0.961263
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.700553    0.441605    0.959501
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.703686    0.444706    0.962665
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.703174    0.447295    0.959054
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.705495    0.450195    0.960795
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.704925    0.446898    0.962952
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.700834    0.438662    0.963006
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.704486    0.447556    0.961417
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707064    0.451154    0.962975
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.705075    0.448966    0.961185
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.706728    0.451232    0.962223
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.706698    0.451426    0.961969
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.705819    0.449909    0.961728
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN    0.7048    0.447979    0.961621
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707109    0.452617    0.961601
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.705332    0.447571    0.963093
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707988    0.453643    0.962334
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN   0.70814    0.453798    0.962483
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.706376    0.451914    0.960837
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.706879    0.452128    0.961629
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN   0.70664    0.451968    0.961312
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708829    0.455121    0.962537
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708067    0.453364    0.962769
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708519    0.454014    0.963024
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708126    0.454224    0.962029
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.706971    0.451967    0.961974
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708518    0.455094    0.961942
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707013     0.45283    0.961197
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.705078    0.449853    0.960302
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN   0.70835    0.453554    0.963146
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707008    0.452738    0.961279
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708169    0.454421    0.961916
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.709687    0.456747    0.962628
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707627     0.45308    0.962175
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.709251    0.455966    0.962536
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708343    0.454848    0.961837
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708238    0.454941    0.961535
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708381    0.454572     0.96219
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707091    0.452433    0.961749
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.708592    0.454623    0.962561
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707354    0.451916    0.962793
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707246     0.45317    0.961322
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707975    0.454141     0.96181
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.707523    0.454092    0.960953
+city
+  label  seg_miou  seg_fg_iou  seg_bg_iou
+0  MEAN  0.705889    0.451153    0.960624

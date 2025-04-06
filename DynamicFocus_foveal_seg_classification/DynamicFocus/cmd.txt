@@ -1,0 +1,41 @@
+# run tensor board
+tensorboard --logdir=a_records_train
+
+
+
+"""
+# 将 nvidia-smi 输出保存到变量中
+nvidia_output=$(nvidia-smi)
+
+# 打印标题
+echo -e "GPU_ID\tPID\tGPU_MEMORY\tUSER\tCOMMAND"
+
+# 解析 nvidia-smi 输出，找到 GPU ID、进程 PID 和显存占用
+echo "$nvidia_output" | awk '
+/Processes/ {process_section=1; next}
+process_section && $0 ~ /^[|]/ && NF > 1 && $5 ~ /^[0-9]+$/ {
+    gpu_id=$2
+    pid=$5
+    memory=$(NF-1)
+    # 去掉 memory 中的竖线符号
+    gsub(/\|/, "", memory)
+    print gpu_id, pid, memory
+}' | while read gpu_id pid memory; do
+    # 使用 ps 获取用户和命令信息
+    user_command=$(ps -o user,command -p $pid --no-headers 2>/dev/null)
+    if [ ! -z "$user_command" ]; then
+        user=$(echo "$user_command" | awk '{print $1}')
+        command=$(echo "$user_command" | cut -d' ' -f2-)
+        # 将信息追加到结果中，用于 column 工具处理
+        echo -e "$gpu_id\t$pid\t$memory\t$user\t$command"
+    fi
+done | column -t -s $'\t'
+
+"""
+
+
+
+tmux attach -t 2
+
+
+TODO check why len(dataset) = 2499 not 2500?

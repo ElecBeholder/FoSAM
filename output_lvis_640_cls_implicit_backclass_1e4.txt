@@ -1,0 +1,165 @@
+
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.662551    0.338286    0.986815    0.173587  0.580201
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.709462    0.430494    0.988431    0.174995  0.581713
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713307    0.438521    0.988093    0.175746  0.581919
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.710152      0.4318    0.988505    0.175976  0.582241
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN    0.7112    0.434781    0.987619    0.175198  0.581409
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713177    0.438139    0.988214    0.176832  0.582523
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.709993    0.432554    0.987432    0.175535  0.581484
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.710855    0.433087    0.988624    0.175973  0.582298
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713232    0.437902    0.988562    0.176766  0.582664
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714318    0.440158    0.988479    0.175892  0.582185
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713751    0.439503    0.987999     0.17536  0.581679
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN   0.71525    0.441854    0.988645    0.175729  0.582187
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714768    0.441208    0.988328    0.177095  0.582711
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.712849    0.437134    0.988565    0.175646  0.582105
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714026     0.43917    0.988883    0.175918    0.5824
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.715028    0.441712    0.988344    0.174515   0.58143
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714367    0.441017    0.987717    0.176375  0.582046
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713247    0.438835    0.987659    0.175374  0.581517
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.714973    0.441886     0.98806    0.176638  0.582349
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.713715    0.439329    0.988102    0.176269  0.582186
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716524    0.444566    0.988481    0.176571  0.582526
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716352    0.444172    0.988532    0.176599  0.582566
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716618    0.445023    0.988214    0.176134  0.582174
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716807    0.444876    0.988738    0.176614  0.582676
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717161     0.44587    0.988452    0.174922  0.581687
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716587    0.444393    0.988782    0.176099   0.58244
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.715766    0.443368    0.988165     0.17565  0.581907
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716492    0.444765    0.988219    0.175503  0.581861
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716439    0.444728     0.98815    0.175889   0.58202
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716473    0.444452    0.988493    0.175661  0.582077
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN   0.71704    0.445623    0.988457    0.176944    0.5827
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717174    0.445809     0.98854    0.176538  0.582539
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716837    0.445464    0.988209    0.176805  0.582507
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716686    0.445139    0.988233    0.176662  0.582447
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716789    0.445091    0.988487    0.176419  0.582453
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717313    0.446171    0.988454    0.175832  0.582143
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716961    0.445607    0.988316    0.175941  0.582128
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717148    0.445912    0.988384    0.175783  0.582083
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716864    0.445254    0.988474    0.176268  0.582371
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716627    0.444693    0.988561    0.175586  0.582074
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716871     0.44539    0.988352    0.176288   0.58232
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN   0.71728    0.446158    0.988402    0.175829  0.582116
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717319    0.446401    0.988236    0.176894  0.582565
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717417    0.446409    0.988426    0.177179  0.582802
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717154    0.445655    0.988652    0.176572  0.582612
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717234    0.446051    0.988417    0.176301  0.582359
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.716976     0.44547    0.988483    0.176899  0.582691
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717135    0.445768    0.988502    0.176727  0.582614
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717574    0.446702    0.988446     0.17666  0.582553
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.717071     0.44573    0.988413     0.17584  0.582126
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.624792    0.264162    0.985421    0.173815  0.579618
+
+
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.619391    0.253344    0.985438    0.169476  0.577457
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.705789    0.423148     0.98843    0.172906  0.580668
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.710356     0.43305    0.987662    0.172473  0.580068

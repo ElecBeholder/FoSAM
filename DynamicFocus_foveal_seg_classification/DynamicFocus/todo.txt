@@ -1,0 +1,12 @@
+
+2. add training pipeline NEED TO refine
+
+4. sampling dots plots and more data visualization
+5. check prepare sample function and error ?
+
+6. think about iteration methods.
+7. GPU Memory optimizaton
+8. add classification model
+
+
+

@@ -1,0 +1,12 @@
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.566923    0.149044    0.984801    0.173884  0.579343
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.708218    0.428126     0.98831    0.174826  0.581568
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.704025    0.421951      0.9861    0.175459  0.580779
+lvis
+  label  seg_miou  seg_fg_iou  seg_bg_iou  cls_fg_iou  cls_miou
+0  MEAN  0.712626    0.436902     0.98835     0.17512  0.581735
