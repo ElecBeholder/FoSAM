@@ -28,7 +28,7 @@ from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
-task_name = '10ViTPixelwise+temperature2+weight2,1'
+task_name = 'T3:10vitgaussian+cls+temperature0.5+weight1,1,50,1000,50+sigma_div100+relpos0.5'
 
 system = platform.system()
 if system == "Windows":
@@ -177,7 +177,7 @@ class EmbeddingClassificationLoss(nn.Module):
         self.debug_count = 0
         self.criterion = nn.CrossEntropyLoss()
         self.bce_loss = nn.BCEWithLogitsLoss()  # 添加 BCE loss
-        self.temperature = 2  # 添加温度参数
+        self.temperature = 0.5  # 添加温度参数
 
     def forward(self, model, mask, class_label, images=None):
         """
@@ -204,9 +204,9 @@ class EmbeddingClassificationLoss(nn.Module):
         
         # 将 downsampled_mask 转换为与 embeddings 相同的格式 [B, H_emb, W_emb, 1]
         downsampled_mask = downsampled_mask.permute(0, 2, 3, 1)  # [B, H_emb, W_emb, 1]
-        
+
         # 使用模型的 make_prediction 方法基于 mask 进行分类预测
-        predictions, neg_similarity = model.image_encoder.segmentation_module.make_prediction(downsampled_mask)
+        predictions, neg_similarity, pos_loss, sigma_loss, rho_loss = model.image_encoder.segmentation_module.make_prediction(downsampled_mask)
         
         # 获取每个样本中所有embedding的预测结果和数量
         all_fg_predictions = model.image_encoder.segmentation_module.all_fg_embeddings_predictions
@@ -313,35 +313,15 @@ class EmbeddingClassificationLoss(nn.Module):
                         plt.savefig(f'../l_sam_experiment/{task_name}_embedding_cls_{self.debug_count}_{b}_6_saliency_overlay.png',
                                   bbox_inches='tight', dpi=150)
                         plt.close(fig)
-
-        # 计算 saliency map 和 ground truth mask 之间的 BCE loss
-        #if hasattr(model.image_encoder.segmentation_module, 'xs') and model.image_encoder.segmentation_module.xs is not None:
-        #    saliency_map = model.image_encoder.segmentation_module.xs  # [B, H, W]
-        #    
-        #    # 确保 saliency map 的值在 [0, 1] 之间，用于 BCE loss
-        #    saliency_map_sigmoid = torch.sigmoid(saliency_map)
-        #    
-        #    # 将 mask 下采样到与 saliency map 相同的大小
-        #    ds_factor_h = H // saliency_map.shape[1]
-        #    ds_factor_w = W // saliency_map.shape[2]
-        #    
-        #    # 使用平均池化进行下采样
-        #    mask_downsampled = F.avg_pool2d(mask, kernel_size=(ds_factor_h, ds_factor_w), 
-        #                                   stride=(ds_factor_h, ds_factor_w))  # [B, 1, H_s, W_s]
-        #    
-        #    # 移除通道维度使形状与 saliency map 匹配
-        #    mask_downsampled = mask_downsampled.squeeze(1)  # [B, H_s, W_s]
-        #    
-        #    # 计算 BCE loss
-        #    saliency_bce_loss = self.bce_loss(saliency_map, mask_downsampled)
-        #    
-        #    # 返回组合的 loss
-        #    return loss, saliency_bce_loss
         margin = 0.0 
         loss_regularization = torch.clamp(neg_similarity - margin, min=0.0)
         loss_regularization = loss_regularization.mean()
         
-        return loss, loss_regularization
+        loss_pos = pos_loss.mean()
+        loss_sigma = sigma_loss.mean()
+        loss_rho = rho_loss.mean()
+        
+        return loss, loss_regularization, loss_pos, loss_sigma, loss_rho
 
 # 初始化 embedding 分类损失函数
 embedding_cls_loss = EmbeddingClassificationLoss().to(device)
@@ -583,14 +563,22 @@ if __name__ == '__main__':
                     #     print(Y_cls_b, file=f)
                     # print(label_bxHxW)
 
-                    embedding_classification_loss, loss_regularization = embedding_cls_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
+                    embedding_classification_loss, loss_regularization, pos_loss, sigma_loss, rho_loss = embedding_cls_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
                     
                     seg_loss = diceloss(pred_bx1KxHxW, label_bxHxW)
                     
-                    lambda_embedding = 2  # 可以根据需要调整权重
-                    lambda_regularization = 0 # 可以根据需要调整权重
-                    
-                    loss = seg_loss + lambda_embedding * embedding_classification_loss + lambda_regularization * loss_regularization
+                    lambda_embedding = 1  # 可以根据需要调整权重
+                    lambda_regularization = 1 # 可以根据需要调整权重
+                    lambda_pos = 50 
+                    lambda_sigma = 1000
+                    lambda_rho = 50 
+
+                    loss = (seg_loss +
+                            lambda_embedding * embedding_classification_loss +
+                            lambda_regularization * loss_regularization +
+                            lambda_pos * pos_loss +
+                            lambda_sigma * sigma_loss +
+                            lambda_rho * rho_loss)
                     if torch.isnan(loss):
                         print(f"\n警告：loss为NaN，已将其设置为0")
                         loss = torch.tensor(0.0, device=loss.device, requires_grad=True)
@@ -600,9 +588,12 @@ if __name__ == '__main__':
                     writer.add_scalar('Loss/seg_loss', seg_loss.item(), global_step)
                     writer.add_scalar('Loss/embedding_cls_loss', embedding_classification_loss.item(), global_step)
                     writer.add_scalar('Loss/loss_regularization', loss_regularization.item(), global_step)
+                    writer.add_scalar('Loss/loss_pos', pos_loss.item(), global_step)
+                    writer.add_scalar('Loss/loss_sigma', sigma_loss.item(), global_step)
+                    writer.add_scalar('Loss/loss_rho', rho_loss.item(), global_step)
                     
                     if bidx % 50 == 0:  # 每50个批次打印一次损失值
-                        print(f"\nBatch {bidx}: Seg Loss: {seg_loss.item():.4f}, Embedding Cls Loss: {embedding_classification_loss.item():.4f}, Loss Regularization: {loss_regularization.item():.4f}")
+                        print(f"\nBatch {bidx}: Seg Loss: {seg_loss.item():.4f}, Embedding Cls Loss: {embedding_classification_loss.item():.4f}, Loss Regularization: {loss_regularization.item():.4f}, Loss Pos: {pos_loss.item()*lambda_pos:.4f}, Loss Sigma: {sigma_loss.item()*lambda_sigma:.4f}, Loss Rho: {rho_loss.item()*lambda_rho:.4f}")
 
                     optimizer.zero_grad()
                     loss.backward()

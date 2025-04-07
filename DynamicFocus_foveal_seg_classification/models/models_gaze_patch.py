@@ -1027,7 +1027,6 @@ class DeformSegmentationModule(nn.Module):
         super(DeformSegmentationModule, self).__init__()
         # 使用轻量级 ViT 作为 backbone
         self.backbone = LightweightViT(dim=384, depth=10, heads=6)
-        print("使用轻量级 ViT 作为 backbone")
         
         # 保留原来的网格大小设置
         self.grid_size_x = 20
@@ -1037,24 +1036,21 @@ class DeformSegmentationModule(nn.Module):
         
         # 分类器用于51类分类
         self.classifier = nn.Linear(384, 51)
+        self.gaussian_predictor = nn.Linear(384, 5)
+        self.dropout = nn.Dropout(0.1)
         
         # 保存中间结果的变量
         self.xs = None  # 用于存储生成的 saliency map
         self.prediction = None  # 用于存储分类预测结果
         self.embeddings = None  # 用于存储所有 embeddings
         self.focus_embedding = None  # 用于存储注视点处的 embedding
+        self.mu_xs = None
+        self.mu_ys = None
+        self.sigma_xs = None
+        self.sigma_ys = None
+        self.rhos = None
     
     def forward(self, img_data, img_original, focus_point, s_bin_selected_BxHMxWMx1=None, segSize=None):
-        """
-        参数:
-            img_data: 已经被tokenize的图像数据 [B, C, 40, 40]
-            img_original: 原始图像
-            focus_point: 注视点坐标 [B, 2]，范围在[0,1]，其中 focus_point[:, 0] 是 x 坐标，focus_point[:, 1] 是 y 坐标
-            s_bin_selected_BxHMxWMx1: 训练时使用的掩码(当前代码不需要)
-            segSize: 分割大小(当前代码不需要)
-        返回:
-            feature_map: 通过 differentiable_topk 选择的特征
-        """
         batch_size = img_data.shape[0]
         
         # 1. 使用 backbone 提取特征
@@ -1069,78 +1065,92 @@ class DeformSegmentationModule(nn.Module):
         focus_x = torch.clamp((focus_point[:, 0, 0, 0] / 640 * W).long(), 0, W-1)  # x 坐标
         focus_y = torch.clamp((focus_point[:, 0, 0, 1] / 640 * H).long(), 0, H-1)  # y 坐标
         
-        # 初始化 saliency map
-        saliency_map = torch.zeros(batch_size, H, W, device=img_data.device)
-        
         # 对每个样本计算 saliency map
-        for b in range(batch_size):
-            # 获取注视点处的 embedding
-            focus_embedding = embeddings[b, focus_y[b], focus_x[b], :]  # [384]
-            
-            # 计算所有位置的 embedding 与注视点 embedding 的余弦相似度
-            # 重塑 embeddings 为 [H*W, 384]
-            flat_embeddings = embeddings[b].reshape(-1, embeddings.shape[-1])
-            
-            # 计算相似度 (归一化后的点积)
-            focus_embedding_norm = focus_embedding / (focus_embedding.norm() + 1e-6)
-            flat_embeddings_norm = flat_embeddings / (flat_embeddings.norm(dim=1, keepdim=True) + 1e-6)
-            similarity = torch.matmul(flat_embeddings_norm, focus_embedding_norm)
-            
-            # 重塑相似度为 [H, W]
-            saliency_map[b] = similarity.reshape(H, W)
+        focus_embedding = embeddings[torch.arange(batch_size), focus_y, focus_x, :]  # [B, 384]
+        dim = embeddings.shape[-1]
+        all_params = self.gaussian_predictor(self.dropout(embeddings.view(-1, dim))) # [B*H*W, 5]
         
-        # 保存 saliency map 供后续使用
-        self.xs = saliency_map
+        # 创建标准化的坐标网格（表示每个像素的位置）
+        y_grid, x_grid = torch.meshgrid(
+            torch.linspace(0, 1, H, device=all_params.device),
+            torch.linspace(0, 1, W, device=all_params.device),
+            indexing='ij'
+        )
+        # 将网格扩展到批次维度 [H, W] -> [B, H, W, 1]
+        x_grid = x_grid.unsqueeze(0).unsqueeze(-1).expand(batch_size, H, W, 1)
+        y_grid = y_grid.unsqueeze(0).unsqueeze(-1).expand(batch_size, H, W, 1)
+        
+        # 预测相对偏移量（使用tanh限制在[-0.5, 0.5]范围内）
+        x_offset = torch.tanh(all_params[:, 0]).view(batch_size, H, W, 1) * 0.5 # 偏移范围为±0.5
+        y_offset = torch.tanh(all_params[:, 1]).view(batch_size, H, W, 1) * 0.5 # 偏移范围为±0.5
+        
+        # 最终均值 = 自身位置 + 预测偏移量
+        mu_xs = torch.clamp(x_grid + x_offset, 0, 1)  # [B, H, W, 1]
+        mu_ys = torch.clamp(y_grid + y_offset, 0, 1)  # [B, H, W, 1]
+        sigma_xs = (F.softplus(all_params[:, 2] + 1e-6)/100).view(batch_size, H, W, 1)  # [B, H, W, 1]
+        sigma_ys = (F.softplus(all_params[:, 3] + 1e-6)/100).view(batch_size, H, W, 1)  # [B, H, W, 1]
+        rhos = torch.tanh(all_params[:, 4]).view(batch_size, H, W, 1)  # [B, H, W, 1]
+        
+        mu_x = mu_xs[torch.arange(batch_size), focus_y, focus_x, 0].view(batch_size, 1, 1) # [B, 1, 1]
+        mu_y = mu_ys[torch.arange(batch_size), focus_y, focus_x, 0].view(batch_size, 1, 1) # [B, 1, 1]
+        sigma_x = sigma_xs[torch.arange(batch_size), focus_y, focus_x, 0].view(batch_size, 1, 1) # [B, 1, 1]
+        sigma_y = sigma_ys[torch.arange(batch_size), focus_y, focus_x, 0].view(batch_size, 1, 1) # [B, 1, 1]
+        rho = rhos[torch.arange(batch_size), focus_y, focus_x, 0].view(batch_size, 1, 1) # [B, 1, 1]
+        
+        x = torch.linspace(0, 1, W, device=all_params.device)
+        y = torch.linspace(0, 1, H, device=all_params.device)
+
+        xx, yy = torch.meshgrid(x, y, indexing='xy')
+        xx = xx.unsqueeze(0).expand(batch_size, H, W)
+        yy = yy.unsqueeze(0).expand(batch_size, H, W)
+
+        norm_const = 1 / (2 * torch.pi * sigma_x * sigma_y * torch.sqrt(1 - rho**2))
+        z_x1 = (xx - mu_x) / sigma_x
+        z_y1 = (yy - mu_y) / sigma_y
+        exponent = (z_x1**2 - 2 * rho * z_x1 * z_y1 + z_y1**2) / (2 * (1 - rho**2))
+        saliency_map_BxHxW = norm_const * torch.exp(-exponent)
+            
+        self.xs = saliency_map_BxHxW
         self.focus_embedding = focus_embedding
         self.focus_y = focus_y
         self.focus_x = focus_x
+        self.mu_xs = mu_xs
+        self.mu_ys = mu_ys
+        self.sigma_xs = sigma_xs
+        self.sigma_ys = sigma_ys
+        self.rhos = rhos
         
-        # 3. 将 saliency map 转换格式并直接调用 differentiable_topk
-        saliency_map_Bx1xHxW = saliency_map.unsqueeze(1)  # [B, 1, H, W]
-        
-        # 调用 differentiable_topk 直接选择重要区域
         selected_feature_map = differentiable_topk(
             img_data, 
-            saliency_map_Bx1xHxW.detach(), 
+            saliency_map_BxHxW.detach(), 
             H_s=self.grid_size_y, 
             W_s=self.grid_size_x, 
             temperature=0.1
         )
         
         return selected_feature_map
-    
-    def make_prediction(self, mask=None):
-        """
-        使用选中的 embeddings 进行分类预测
-        参数:
-            mask: 用于选择 embeddings 的掩码 [B, H, W, 1]
-        返回:
-            predictions: 分类预测结果 [B, 51]
-        """
-        if mask is None:
-            # 如果没有提供掩码，使用 saliency map 作为掩码
-            mask = (self.xs > self.xs.mean(dim=[1, 2], keepdim=True)).float().unsqueeze(-1)
-        
-        batch_size = self.embeddings.shape[0]
+
+    def make_prediction(self, mask_downsampled=None):
+        batch_size, H, W, _ = mask_downsampled.shape
         predictions = []
-        # 存储每个样本中所有embedding的分类结果
         all_fg_embeddings_preds = []
-        #all_bg_embeddings_preds = []
         all_embeddings_preds = []
-        # 存储每个样本中选定的embedding数量
         num_embeddings_per_sample = []
         similarity_list = []
+        pos_loss_list = []
+        sigma_loss_list = []
+        rho_loss_list = []
         
         for b in range(batch_size):
             # 使用掩码选择 embeddings
-            current_mask = mask[b, :, :, 0]  # [H, W]
-            selected_indices = torch.nonzero(current_mask > 0.2)  # [N, 2]
-            un_selected_indices = torch.nonzero(current_mask <= 0.2)  # [N, 2]
+            current_mask_downsampled = mask_downsampled[b, :, :, 0]  # [H, W]
+            selected_indices = torch.nonzero(current_mask_downsampled > 0.2)  # [N, 2]
+            un_selected_indices = torch.nonzero(current_mask_downsampled <= 0.2)  # [N, 2]
             
             pred_all = self.classifier(self.embeddings[b].view(-1 ,self.embeddings.shape[-1]))
             all_embeddings_preds.append(pred_all)
             if len(selected_indices) == 0:
-                selected_embedding = self.focus_embedding  # [384]
+                selected_embedding = self.focus_embedding[b]  # [384]
                 # 对单个embedding进行分类
                 pred = self.classifier(selected_embedding)  # [51]
                 predictions.append(pred)
@@ -1148,9 +1158,16 @@ class DeformSegmentationModule(nn.Module):
                 all_fg_embeddings_preds.append(pred.unsqueeze(0))
                 num_embeddings_per_sample.append(1)
                 fg_embeddings = selected_embedding
-                mask_unselect = torch.ones_like(current_mask).type(torch.bool)
+                mask_unselect = torch.ones_like(current_mask_downsampled).type(torch.bool)
                 mask_unselect[self.focus_y[b], self.focus_x[b]] = 0
                 bg_embeddings = self.embeddings[b].view(-1 ,self.embeddings.shape[-1])[mask_unselect.view(-1)]
+                
+                mu_x = self.mu_xs[b, self.focus_y[b], self.focus_x[b], 0]
+                mu_y = self.mu_ys[b, self.focus_y[b], self.focus_x[b], 0]
+                sigma_x = self.sigma_xs[b, self.focus_y[b], self.focus_x[b], 0]
+                sigma_y = self.sigma_ys[b, self.focus_y[b], self.focus_x[b], 0]
+                rho = self.rhos[b, self.focus_y[b], self.focus_x[b], 0]
+                
                 #pred_bg = self.classifier(bg_embeddings)
                 #all_bg_embeddings_preds.append(pred_bg.unsqueeze(0))
             else:
@@ -1174,11 +1191,42 @@ class DeformSegmentationModule(nn.Module):
                 # 计算平均预测结果
                 pred = individual_preds.mean(dim=0)  # [51]
                 predictions.append(pred)
+                
+                mu_x = self.mu_xs[b, selected_indices[:, 0], selected_indices[:, 1], 0]
+                mu_y = self.mu_ys[b, selected_indices[:, 0], selected_indices[:, 1], 0]
+                sigma_x = self.sigma_xs[b, selected_indices[:, 0], selected_indices[:, 1], 0]
+                sigma_y = self.sigma_ys[b, selected_indices[:, 0], selected_indices[:, 1], 0]
+                rho = self.rhos[b, selected_indices[:, 0], selected_indices[:, 1], 0]
+                
 
             focus_embedding_norm = fg_embeddings / (fg_embeddings.norm() + 1e-6)
             flat_embeddings_norm = bg_embeddings / (bg_embeddings.norm(dim=1, keepdim=True) + 1e-6)
             similarity_list.append(torch.matmul(flat_embeddings_norm, focus_embedding_norm))
-        
+            
+            mask_indices = torch.nonzero(current_mask_downsampled)
+            y_coords = mask_indices[:, 0].float() / H
+            x_coords = mask_indices[:, 1].float() / W
+            mask_mean_x = x_coords.mean()
+            mask_mean_y = y_coords.mean()
+            if x_coords.size(0) == 1:
+                mask_sigma_x = 0
+                mask_sigma_y = 0
+            else:
+                mask_sigma_x = torch.sqrt(x_coords.var())
+                mask_sigma_y = torch.sqrt(y_coords.var())
+            mask_cov = ((x_coords - mask_mean_x) * (y_coords - mask_mean_y)).mean()
+            if mask_sigma_x * mask_sigma_y != 0:
+                mask_rho = mask_cov / (mask_sigma_x * mask_sigma_y)
+            else:
+                mask_rho = 0
+            
+            l2_loss_pos = (0.5*((mu_x - mask_mean_x)**2 + (mu_y - mask_mean_y)**2)).mean()
+            l2_loss_sigma = (0.5*((sigma_x - mask_sigma_x)**2 + (sigma_y - mask_sigma_y)**2)).mean()
+            l2_loss_rho = (0.5*(rho - mask_rho)**2).mean()
+            pos_loss_list.append(l2_loss_pos)
+            sigma_loss_list.append(l2_loss_sigma)
+            rho_loss_list.append(l2_loss_rho)
+
         # 将预测结果保存为 [B, 51] 格式
         self.prediction = torch.stack(predictions)
         # 保存每个样本中所有embedding的预测结果和数量信息
@@ -1187,7 +1235,7 @@ class DeformSegmentationModule(nn.Module):
         #self.all_bg_embeddings_predictions = all_bg_embeddings_preds
         self.num_embeddings_per_sample = num_embeddings_per_sample
         
-        return self.prediction, torch.cat(similarity_list)
+        return self.prediction, torch.cat(similarity_list), torch.stack(pos_loss_list), torch.stack(sigma_loss_list), torch.stack(rho_loss_list)
 
 
 class LightweightViT(nn.Module):
