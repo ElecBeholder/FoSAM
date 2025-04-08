@@ -28,7 +28,7 @@ from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
-task_name = 'T3:10vitgaussian+cls+temperature0.5+weight1,1,50,1000,50+sigma_div100+relpos0.5'
+task_name = 'T4:10vitgaussian+cls+temperature0.5+weight1,0,50,1000,50+sigma_div100+relpos0.2'
 
 system = platform.system()
 if system == "Windows":
@@ -568,7 +568,7 @@ if __name__ == '__main__':
                     seg_loss = diceloss(pred_bx1KxHxW, label_bxHxW)
                     
                     lambda_embedding = 1  # 可以根据需要调整权重
-                    lambda_regularization = 1 # 可以根据需要调整权重
+                    lambda_regularization = 0 # 可以根据需要调整权重
                     lambda_pos = 50 
                     lambda_sigma = 1000
                     lambda_rho = 50 
@@ -778,4 +778,10 @@ if __name__ == '__main__':
                         print(mean_cls_foreground_miou.cpu().numpy().item(), file=f)
                         print("cls_mean", file=f)
                         print(0.5 * mean_cls_foreground_miou.cpu().numpy().item() + 0.5 * mean_seg_bg_iou.item(), file=f)
+                    
+                    # 保存模型
+                    checkpoint_path = os.path.join('/home/external/DynamicFocus_new_ziqi/l_sam_experiment', task_name + "checkpoint.pt")
+                    torch.save(efficientsam_ti_custom.state_dict(), checkpoint_path)
+                    print(f"model saved to: {checkpoint_path}")
+                    
                     optimizer.step()

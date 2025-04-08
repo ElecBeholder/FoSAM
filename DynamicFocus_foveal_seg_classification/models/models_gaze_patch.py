@@ -1081,8 +1081,8 @@ class DeformSegmentationModule(nn.Module):
         y_grid = y_grid.unsqueeze(0).unsqueeze(-1).expand(batch_size, H, W, 1)
         
         # 预测相对偏移量（使用tanh限制在[-0.5, 0.5]范围内）
-        x_offset = torch.tanh(all_params[:, 0]).view(batch_size, H, W, 1) * 0.5 # 偏移范围为±0.5
-        y_offset = torch.tanh(all_params[:, 1]).view(batch_size, H, W, 1) * 0.5 # 偏移范围为±0.5
+        x_offset = torch.tanh(all_params[:, 0]).view(batch_size, H, W, 1) * 0.2 # 偏移范围为±0.5
+        y_offset = torch.tanh(all_params[:, 1]).view(batch_size, H, W, 1) * 0.2 # 偏移范围为±0.5
         
         # 最终均值 = 自身位置 + 预测偏移量
         mu_xs = torch.clamp(x_grid + x_offset, 0, 1)  # [B, H, W, 1]
