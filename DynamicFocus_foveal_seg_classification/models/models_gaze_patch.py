@@ -547,6 +547,90 @@ def differentiable_topk(feature_map_BxCxHxW, saliency_map_BxHxW, H_s=20, W_s=20,
     indices = torch.gather(indices, 1, sort_order)
     return selected_feature_map_sorted_BxCxK.view(B, C, H_s, W_s), indices
 
+def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_tokens=30):
+    """
+    动态选择token，选取所有大于最大值*cut_ratio的token，且确保至少选择min_tokens个token
+    
+    Args:
+        feature_map_BxCxHxW: 特征图 [B, C, H, W]
+        saliency_map_BxHxW: 显著图 [B, H, W]
+        cut_ratio: 阈值系数，默认0.005
+        min_tokens: 最小token数量，默认30
+        
+    Returns:
+        selected_feature_map: 选中的特征 [B, C, max_K]，已进行zero padding
+        indices: 选中token的索引 [B, max_K]
+    """
+    B, C, H, W = feature_map_BxCxHxW.shape
+    # 将显著图展平
+    saliency_flat_BxHW = saliency_map_BxHxW.view(B, -1)
+    
+    # 找到每个样本的最大值
+    max_s, _ = torch.max(saliency_flat_BxHW, dim=1, keepdim=True)  # [B, 1]
+    
+    # 计算阈值
+    threshold = max_s * cut_ratio  # [B, 1]
+    
+    # 创建mask，标记所有大于阈值的位置
+    mask_BxHW = (saliency_flat_BxHW > threshold).float()  # [B, H*W]
+    
+    # 计算每个样本选中的token数量
+    sample_token_counts = torch.sum(mask_BxHW, dim=1).int()  # [B]
+    
+    # 对于token数量少于min_tokens的样本，调整其mask以包含至少min_tokens个token
+    for b in range(B):
+        if sample_token_counts[b] < min_tokens:
+            # 获取当前样本的显著度值
+            saliency_b = saliency_flat_BxHW[b]
+            # 获取显著度排序索引（降序）
+            _, indices_sorted = torch.sort(saliency_b, descending=True)
+            # 选择前min_tokens个索引
+            top_indices = indices_sorted[:min_tokens]
+            # 创建新的mask
+            new_mask = torch.zeros_like(mask_BxHW[b])
+            new_mask[top_indices] = 1.0
+            # 更新mask和token计数
+            mask_BxHW[b] = new_mask
+            sample_token_counts[b] = min_tokens
+    
+    # 获取最大的token数量用于padding
+    max_tokens = torch.max(sample_token_counts).item()
+    
+    # 准备存储选中的特征和索引
+    selected_feature_map = []
+    all_indices = []
+    
+    # 特征展平
+    feature_flat_BxCxHW = feature_map_BxCxHxW.view(B, C, -1)
+    
+    for b in range(B):
+        # 获取当前样本中所有大于阈值的索引
+        indices = torch.nonzero(mask_BxHW[b] > 0).squeeze(1)  # [K_b]
+        count = indices.size(0)
+        
+        # 选择对应的特征
+        indices_exp = indices.unsqueeze(0).expand(C, -1)  # [C, count]
+        selected_features = torch.gather(feature_flat_BxCxHW[b], 1, indices_exp)  # [C, count]
+        
+        # 如果数量不足，进行padding
+        if count < max_tokens:
+            # 创建特征填充（全零特征）
+            feature_padding = torch.zeros(C, max_tokens - count, device=selected_features.device)
+            selected_features = torch.cat([selected_features, feature_padding], dim=1)  # [C, max_tokens]
+            
+            # 创建索引填充（使用-1表示无效索引）
+            index_padding = torch.full((max_tokens - count,), -1, dtype=indices.dtype, device=indices.device)
+            indices = torch.cat([indices, index_padding], dim=0)  # [max_tokens]
+        
+        selected_feature_map.append(selected_features)
+        all_indices.append(indices)
+    
+    # 堆叠所有样本的结果
+    selected_feature_map = torch.stack(selected_feature_map, dim=0)  # [B, C, max_tokens]
+    all_indices = torch.stack(all_indices, dim=0)  # [B, max_tokens]
+    
+    return selected_feature_map, all_indices, sample_token_counts
+
 class SoftDiceLossV1(nn.Module):
     '''
     soft-dice loss, useful in binary segmentation
@@ -1049,6 +1133,8 @@ class DeformSegmentationModule(nn.Module):
         self.sigma_xs = None
         self.sigma_ys = None
         self.rhos = None
+        
+        self.token_count_list = []
     
     def forward(self, img_data, img_original, focus_point, s_bin_selected_BxHMxWMx1=None, segSize=None):
         batch_size = img_data.shape[0]
@@ -1081,8 +1167,8 @@ class DeformSegmentationModule(nn.Module):
         y_grid = y_grid.unsqueeze(0).unsqueeze(-1).expand(batch_size, H, W, 1)
         
         # 预测相对偏移量（使用tanh限制在[-0.5, 0.5]范围内）
-        x_offset = torch.tanh(all_params[:, 0]).view(batch_size, H, W, 1) * 0.2 # 偏移范围为±0.5
-        y_offset = torch.tanh(all_params[:, 1]).view(batch_size, H, W, 1) * 0.2 # 偏移范围为±0.5
+        x_offset = torch.tanh(all_params[:, 0]).view(batch_size, H, W, 1) * 0.0 # 偏移范围为±0.5
+        y_offset = torch.tanh(all_params[:, 1]).view(batch_size, H, W, 1) * 0.0 # 偏移范围为±0.5
         
         # 最终均值 = 自身位置 + 预测偏移量
         mu_xs = torch.clamp(x_grid + x_offset, 0, 1)  # [B, H, W, 1]
@@ -1120,15 +1206,16 @@ class DeformSegmentationModule(nn.Module):
         self.sigma_ys = sigma_ys
         self.rhos = rhos
         
-        selected_feature_map = differentiable_topk(
+        selected_feature_map, indices, sample_token_counts = dynamic_topk(
             img_data, 
             saliency_map_BxHxW.detach(), 
-            H_s=self.grid_size_y, 
-            W_s=self.grid_size_x, 
-            temperature=0.1
+            cut_ratio=0.005,
+            min_tokens=30
         )
         
-        return selected_feature_map
+        self.token_count_list.append(sample_token_counts.detach().cpu().numpy())
+
+        return selected_feature_map, indices
 
     def make_prediction(self, mask_downsampled=None):
         batch_size, H, W, _ = mask_downsampled.shape

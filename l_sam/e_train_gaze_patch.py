@@ -28,7 +28,7 @@ from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
-task_name = 'T4:10vitgaussian+cls+temperature0.5+weight1,0,50,1000,50+sigma_div100+relpos0.2'
+task_name = 'T4:10vitgaussian+cls+temperature0.5+weight1,0,50,1000,50+sigma_div100+relpos0+DW0.005(min30)'
 
 system = platform.system()
 if system == "Windows":
@@ -502,6 +502,12 @@ if __name__ == '__main__':
         os.makedirs(dpath, exist_ok=True)
         # multi_class_miou_evaluator = MulticlassJaccardIndex(num_classes=class_num + 1).to(device=device)
         global_step = 0
+
+        # 加载模型
+        #print('\n加载模型!\n')
+        #checkpoint_path = os.path.join("/home/external/DynamicFocus_new_ziqi/l_sam_experiment/T3:10vitgaussian+cls+temperature0.5+weight1,0,50,1000,50+sigma_div100+relpos0+DWcheckpoint.pt")
+        #efficientsam_ti_custom.load_state_dict(torch.load(checkpoint_path))
+
         for epoch in trange(num_epochs):
             batch_size = 8
 
@@ -569,9 +575,9 @@ if __name__ == '__main__':
                     
                     lambda_embedding = 1  # 可以根据需要调整权重
                     lambda_regularization = 0 # 可以根据需要调整权重
-                    lambda_pos = 50 
+                    lambda_pos = 50
                     lambda_sigma = 1000
-                    lambda_rho = 50 
+                    lambda_rho = 50
 
                     loss = (seg_loss +
                             lambda_embedding * embedding_classification_loss +
@@ -594,6 +600,10 @@ if __name__ == '__main__':
                     
                     if bidx % 50 == 0:  # 每50个批次打印一次损失值
                         print(f"\nBatch {bidx}: Seg Loss: {seg_loss.item():.4f}, Embedding Cls Loss: {embedding_classification_loss.item():.4f}, Loss Regularization: {loss_regularization.item():.4f}, Loss Pos: {pos_loss.item()*lambda_pos:.4f}, Loss Sigma: {sigma_loss.item()*lambda_sigma:.4f}, Loss Rho: {rho_loss.item()*lambda_rho:.4f}")
+                        token_count_list = efficientsam_ti_custom.image_encoder.segmentation_module.token_count_list
+                        if len(token_count_list) > 0:
+                            print('\ntoken_mean', np.mean(np.concatenate(token_count_list)), 'token_max', np.max(np.concatenate(token_count_list)), 'token_min', np.min(np.concatenate(token_count_list)))
+                            efficientsam_ti_custom.image_encoder.segmentation_module.token_count_list = []
 
                     optimizer.zero_grad()
                     loss.backward()
@@ -656,7 +666,7 @@ if __name__ == '__main__':
                         # )
 
                         # wang ----------------
-                        if bidx == 0:
+                        if bidx % 100 == 0:
                             for i in range(8):
                                 import matplotlib.pyplot as plt
                                 arr = image_bx3xHxW[i,0,:,:].cpu().numpy()
@@ -675,7 +685,7 @@ if __name__ == '__main__':
                         )
 
                         # wang ----------------
-                        if bidx == 0:
+                        if bidx % 100 == 0:
                             for i in range(8):
                                 arr = output_masks_bx1x1xHxW[i,0,0,:,:].cpu().numpy()
                                 plt.imsave('../l_sam_experiment/{}_{}_outputmask.png'.format(task_name,i), arr, cmap='gray')
@@ -687,7 +697,7 @@ if __name__ == '__main__':
                         Y_bx1xHxW = Y_bx1xHxW[:, :, :, :].to(device=device)
 
                         # wang ----------------
-                        if bidx == 0:
+                        if bidx % 100 == 0:
                             for i in range(8):
                                 arr = mask_bx1xHxW[i,0,:,:].cpu().numpy()
                                 plt.imsave('../l_sam_experiment/{}_{}_outputmask_t.png'.format(task_name,i), arr, cmap='gray')

@@ -386,28 +386,35 @@ class ImageEncoderViT(nn.Module):
         #x, grid = self.segmentation_module(x, batched_points, s_bin_selected_BxHMxWMx1, segSize)
         x, indices = self.segmentation_module(x, img_original, batched_points, s_bin_selected_BxHMxWMx1, segSize)
 
-        x = x.permute(0, 2, 3, 1)
+        x = x.permute(0, 2, 1)
 
         ####################################################################################################################################
 
-        num_patches = x.shape[1]
-        assert x.shape[2] == num_patches
-        x = x.reshape(x.shape[0], num_patches * num_patches, x.shape[3])
-
-        # x = x.view(1, 1, 4096, 192)
-        x = x[:,:,:]
-
         for blk in self.blocks:
             x = blk(x)
-        x = x.reshape(x.shape[0], num_patches, num_patches, x.shape[2])
 
         # wang topk_reconstruct
-        x = x.permute(0, 3, 1, 2)
+        x = x.permute(0, 2, 1)
         x_flat = x.view(x.shape[0], x.shape[1], -1)
         full_x = torch.zeros(x.shape[0], x.shape[1], 40*40).to(x.device)
-        full_x.scatter_(2, indices.unsqueeze(1).expand(-1, x.shape[1], -1), x_flat)
+        
+        # 创建有效索引的掩码（过滤掉-1索引）
+        valid_indices_mask = indices >= 0  # [B, max_tokens]
+        
+        # 对每个批次单独处理
+        for b in range(indices.shape[0]):
+            # 获取当前批次的有效索引
+            valid_mask = valid_indices_mask[b]  # [max_tokens]
+            valid_indices = indices[b, valid_mask]  # [valid_count]
+            
+            # 只使用有效索引进行恢复
+            if valid_indices.numel() > 0:  # 确保有有效索引
+                valid_features = x_flat[b, :, valid_mask]  # [C, valid_count]
+                valid_indices_exp = valid_indices.unsqueeze(0).expand(x.shape[1], -1)  # [C, valid_count]
+                full_x[b].scatter_(1, valid_indices_exp, valid_features)
+        
         full_x = full_x.view(full_x.shape[0], -1, 40, 40)
-        x = x.permute(0, 2, 3, 1)
+        #x = x.permute(0, 2, 3, 1)
         # wang topk_reconstruct
 
         #x = x.permute(0, 3, 1, 2)
