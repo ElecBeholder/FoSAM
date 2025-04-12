@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../')
 
 from datetime import datetime
 
+import torch
 from torch import nn
 
 from d_model.nn_A1_tools import merge_seg_cls, merge_seg_label
@@ -26,9 +27,11 @@ from d_model.nn_A3_metrics import evaluate_segmentation, evaluate_classification
 from torchmetrics.classification import MulticlassJaccardIndex
 from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+#os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+torch.set_num_threads(5)
 
-task_name = 'T4:10vitgaussian+cls+temperature0.5+weight1,0,50,1000,50+sigma_div100+relpos0+DW0.005(min30)'
+task_name = 'T1:10vitgaussian+cls+temperature0.5+weight1,0,10,1000,10+sigma_div100+relpos0+DW0.0005(min100)+l11e-4+l31e-2'
 
 system = platform.system()
 if system == "Windows":
@@ -40,7 +43,7 @@ import torch
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter(log_dir='/home/external/DynamicFocus_new_ziqi/l_sam_experiment')
+writer = SummaryWriter(log_dir='/workspace/DynamicFocus_new_ziqi/l_sam_experiment')
 
 from tqdm import trange
 
@@ -177,7 +180,7 @@ class EmbeddingClassificationLoss(nn.Module):
         self.debug_count = 0
         self.criterion = nn.CrossEntropyLoss()
         self.bce_loss = nn.BCEWithLogitsLoss()  # 添加 BCE loss
-        self.temperature = 0.5  # 添加温度参数
+        self.temperature = 0.5 # 添加温度参数
 
     def forward(self, model, mask, class_label, images=None):
         """
@@ -328,7 +331,7 @@ embedding_cls_loss = EmbeddingClassificationLoss().to(device)
 
 if __name__ == '__main__':
 
-    old_state_dict = torch.load("/home/external/DynamicFocus_new_ziqi/l_sam/efficient_sam_vits.singlemask.pt")['model']
+    old_state_dict = torch.load("/workspace/DynamicFocus_new_ziqi/l_sam/efficient_sam_vits.singlemask.pt")['model']
     # old_state_dict = torch.load("/root/autodl-tmp/DynamicFocus/l_sam/efficient_sam_vits.pt")
 
     # # copy mask 1 to 0
@@ -473,10 +476,7 @@ if __name__ == '__main__':
                         
 
 
-        lr1 = 5e-4
-        #lr1 = 1e-3
-        # lr2 = 3e-4
-        # lr2 = 5e-4 # setting 1 slow 70 epoch 0.027
+        lr1 = 1e-4
         lr2 = 1e-2
         lr3 = 1e-2
         num_epochs = 200
@@ -575,9 +575,9 @@ if __name__ == '__main__':
                     
                     lambda_embedding = 1  # 可以根据需要调整权重
                     lambda_regularization = 0 # 可以根据需要调整权重
-                    lambda_pos = 50
+                    lambda_pos = 10
                     lambda_sigma = 1000
-                    lambda_rho = 50
+                    lambda_rho = 10
 
                     loss = (seg_loss +
                             lambda_embedding * embedding_classification_loss +
@@ -790,7 +790,7 @@ if __name__ == '__main__':
                         print(0.5 * mean_cls_foreground_miou.cpu().numpy().item() + 0.5 * mean_seg_bg_iou.item(), file=f)
                     
                     # 保存模型
-                    checkpoint_path = os.path.join('/home/external/DynamicFocus_new_ziqi/l_sam_experiment', task_name + "checkpoint.pt")
+                    checkpoint_path = os.path.join('/workspace/DynamicFocus_new_ziqi/l_sam_experiment', task_name + "checkpoint.pt")
                     torch.save(efficientsam_ti_custom.state_dict(), checkpoint_path)
                     print(f"model saved to: {checkpoint_path}")
                     

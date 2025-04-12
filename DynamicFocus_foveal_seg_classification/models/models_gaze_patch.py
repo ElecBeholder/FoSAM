@@ -560,6 +560,8 @@ def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_t
     Returns:
         selected_feature_map: 选中的特征 [B, C, max_K]，已进行zero padding
         indices: 选中token的索引 [B, max_K]
+        sample_token_counts: 每个样本实际选择的token数量 [B]
+        padding_mask: 指示哪些位置是padding的mask [B, max_K]，1表示有效token，0表示padding
     """
     B, C, H, W = feature_map_BxCxHxW.shape
     # 将显著图展平
@@ -599,6 +601,7 @@ def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_t
     # 准备存储选中的特征和索引
     selected_feature_map = []
     all_indices = []
+    padding_masks = []  # 用于存储padding mask
     
     # 特征展平
     feature_flat_BxCxHW = feature_map_BxCxHxW.view(B, C, -1)
@@ -612,6 +615,9 @@ def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_t
         indices_exp = indices.unsqueeze(0).expand(C, -1)  # [C, count]
         selected_features = torch.gather(feature_flat_BxCxHW[b], 1, indices_exp)  # [C, count]
         
+        # 创建padding mask，1表示有效token，0表示padding
+        padding_mask = torch.ones(max_tokens, device=indices.device)
+        
         # 如果数量不足，进行padding
         if count < max_tokens:
             # 创建特征填充（全零特征）
@@ -621,15 +627,20 @@ def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_t
             # 创建索引填充（使用-1表示无效索引）
             index_padding = torch.full((max_tokens - count,), -1, dtype=indices.dtype, device=indices.device)
             indices = torch.cat([indices, index_padding], dim=0)  # [max_tokens]
+            
+            # 更新padding mask，将padding位置设为0
+            padding_mask[count:] = 0
         
         selected_feature_map.append(selected_features)
         all_indices.append(indices)
+        padding_masks.append(padding_mask)
     
     # 堆叠所有样本的结果
     selected_feature_map = torch.stack(selected_feature_map, dim=0)  # [B, C, max_tokens]
     all_indices = torch.stack(all_indices, dim=0)  # [B, max_tokens]
+    padding_mask = torch.stack(padding_masks, dim=0)  # [B, max_tokens]
     
-    return selected_feature_map, all_indices, sample_token_counts
+    return selected_feature_map, all_indices, sample_token_counts, padding_mask
 
 class SoftDiceLossV1(nn.Module):
     '''
@@ -1206,16 +1217,16 @@ class DeformSegmentationModule(nn.Module):
         self.sigma_ys = sigma_ys
         self.rhos = rhos
         
-        selected_feature_map, indices, sample_token_counts = dynamic_topk(
+        selected_feature_map, indices, sample_token_counts, padding_mask = dynamic_topk(
             img_data, 
             saliency_map_BxHxW.detach(), 
-            cut_ratio=0.005,
-            min_tokens=30
+            cut_ratio=0.0005,
+            min_tokens=100
         )
         
         self.token_count_list.append(sample_token_counts.detach().cpu().numpy())
 
-        return selected_feature_map, indices
+        return selected_feature_map, indices, sample_token_counts, padding_mask
 
     def make_prediction(self, mask_downsampled=None):
         batch_size, H, W, _ = mask_downsampled.shape

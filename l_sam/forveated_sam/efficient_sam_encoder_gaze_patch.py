@@ -128,7 +128,7 @@ class Attention(nn.Module):
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.proj = nn.Linear(dim, dim)
 
-    def forward(self, x):
+    def forward(self, x, padding_mask=None):
         B, N, C = x.shape
         qkv = (
             self.qkv(x)
@@ -141,6 +141,23 @@ class Attention(nn.Module):
             qkv[2],
         )
         attn = (q @ k.transpose(-2, -1)) * self.scale
+
+        # 应用padding mask
+        if padding_mask is not None:
+            # 将padding_mask扩展为[B, 1, 1, N]以便于广播
+            # 注意：attention的形状是[B, num_heads, N, N]
+            padding_mask = padding_mask.view(B, 1, 1, N)
+            
+            # 创建掩码矩阵：只有两个token都是非padding时才允许attention
+            # attention_mask的形状是[B, 1, N, N]
+            attention_mask = padding_mask * padding_mask.transpose(-2, -1)
+            
+            # 扩展掩码到所有注意力头 [B, num_heads, N, N]
+            attention_mask = attention_mask.expand(-1, self.num_heads, -1, -1)
+            
+            # 将掩码应用到注意力分数上
+            attn = attn.masked_fill(attention_mask == 0, -1e9)
+        
         attn = attn.softmax(dim=-1)
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
@@ -195,8 +212,8 @@ class Block(nn.Module):
             act_layer=act_layer,
         )
 
-    def forward(self, x):
-        x = x + self.attn(self.norm1(x))
+    def forward(self, x, padding_mask=None):
+        x = x + self.attn(self.norm1(x), padding_mask)
         x = x + self.mlp(self.norm2(x))
         return x
 
@@ -384,14 +401,14 @@ class ImageEncoderViT(nn.Module):
 
         segSize = 20
         #x, grid = self.segmentation_module(x, batched_points, s_bin_selected_BxHMxWMx1, segSize)
-        x, indices = self.segmentation_module(x, img_original, batched_points, s_bin_selected_BxHMxWMx1, segSize)
+        x, indices, _, padding_mask = self.segmentation_module(x, img_original, batched_points, s_bin_selected_BxHMxWMx1, segSize)
 
         x = x.permute(0, 2, 1)
 
         ####################################################################################################################################
 
         for blk in self.blocks:
-            x = blk(x)
+            x = blk(x, None)
 
         # wang topk_reconstruct
         x = x.permute(0, 2, 1)
