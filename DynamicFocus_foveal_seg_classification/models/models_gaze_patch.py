@@ -31,6 +31,7 @@ from pytorch_toolbelt.losses.dice import DiceLoss
 
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
+import math
 
 
 class GaussianPredictor_old(nn.Module):
@@ -1121,7 +1122,7 @@ class DeformSegmentationModule(nn.Module):
     def __init__(self, cfg):
         super(DeformSegmentationModule, self).__init__()
         # 使用轻量级 ViT 作为 backbone
-        self.backbone = LightweightViT(dim=384, depth=10, heads=6)
+        self.backbone = LightweightViT(dim=384, depth=10, heads=3)
         
         # 保留原来的网格大小设置
         self.grid_size_x = 20
@@ -1184,8 +1185,8 @@ class DeformSegmentationModule(nn.Module):
         # 最终均值 = 自身位置 + 预测偏移量
         mu_xs = torch.clamp(x_grid + x_offset, 0, 1)  # [B, H, W, 1]
         mu_ys = torch.clamp(y_grid + y_offset, 0, 1)  # [B, H, W, 1]
-        sigma_xs = (F.softplus(all_params[:, 2] + 1e-6)/100).view(batch_size, H, W, 1)  # [B, H, W, 1]
-        sigma_ys = (F.softplus(all_params[:, 3] + 1e-6)/100).view(batch_size, H, W, 1)  # [B, H, W, 1]
+        sigma_xs = (F.softplus(all_params[:, 2] + 1e-6)).view(batch_size, H, W, 1)  # [B, H, W, 1]
+        sigma_ys = (F.softplus(all_params[:, 3] + 1e-6)).view(batch_size, H, W, 1)  # [B, H, W, 1]
         rhos = torch.tanh(all_params[:, 4]).view(batch_size, H, W, 1)  # [B, H, W, 1]
         
         mu_x = mu_xs[torch.arange(batch_size), focus_y, focus_x, 0].view(batch_size, 1, 1) # [B, 1, 1]
@@ -1220,7 +1221,7 @@ class DeformSegmentationModule(nn.Module):
         selected_feature_map, indices, sample_token_counts, padding_mask = dynamic_topk(
             img_data, 
             saliency_map_BxHxW.detach(), 
-            cut_ratio=0.0001,
+            cut_ratio=0.0005,
             min_tokens=100
         )
         
@@ -1235,9 +1236,7 @@ class DeformSegmentationModule(nn.Module):
         all_embeddings_preds = []
         num_embeddings_per_sample = []
         similarity_list = []
-        pos_loss_list = []
-        sigma_loss_list = []
-        rho_loss_list = []
+        nll_loss_list = []
         
         for b in range(batch_size):
             # 使用掩码选择 embeddings
@@ -1304,26 +1303,25 @@ class DeformSegmentationModule(nn.Module):
             mask_indices = torch.nonzero(current_mask_downsampled)
             y_coords = mask_indices[:, 0].float() / H
             x_coords = mask_indices[:, 1].float() / W
-            mask_mean_x = x_coords.mean()
-            mask_mean_y = y_coords.mean()
-            if x_coords.size(0) == 1:
-                mask_sigma_x = 0.01
-                mask_sigma_y = 0.01
-            else:
-                mask_sigma_x = torch.max(torch.sqrt(x_coords.var()), torch.tensor(0.01, device=x_coords.device))
-                mask_sigma_y = torch.max(torch.sqrt(y_coords.var()), torch.tensor(0.01, device=y_coords.device))
-            mask_cov = ((x_coords - mask_mean_x) * (y_coords - mask_mean_y)).mean()
-            if mask_sigma_x * mask_sigma_y != 0:
-                mask_rho = mask_cov / (mask_sigma_x * mask_sigma_y)
-            else:
-                mask_rho = 0
             
-            l2_loss_pos = (0.5*((mu_x - mask_mean_x)**2 + (mu_y - mask_mean_y)**2)).mean()
-            l2_loss_sigma = (0.5*((sigma_x - mask_sigma_x)**2 + (sigma_y - mask_sigma_y)**2)).mean()
-            l2_loss_rho = (0.5*(rho - mask_rho)**2).mean()
-            pos_loss_list.append(l2_loss_pos)
-            sigma_loss_list.append(l2_loss_sigma)
-            rho_loss_list.append(l2_loss_rho)
+            # 计算二维高斯分布的负对数似然损失
+            # log(2π·σx·σy·√(1-ρ²)) + z/(2·(1-ρ²))
+            # 其中 z = ((x-μx)/σx)² - 2ρ·((x-μx)/σx)·((y-μy)/σy) + ((y-μy)/σy)²
+            
+            # 计算预测高斯分布的负对数似然
+            mu_x = mu_x.reshape(-1, 1).repeat(1, len(x_coords))
+            mu_y = mu_y.reshape(-1, 1).repeat(1, len(x_coords))
+            sigma_x = sigma_x.reshape(-1, 1).repeat(1, len(x_coords))
+            sigma_y = sigma_y.reshape(-1, 1).repeat(1, len(x_coords))
+            rho = rho.reshape(-1, 1).repeat(1, len(x_coords))
+            term1 = torch.log(2 * math.pi * sigma_x * sigma_y * torch.sqrt(1 - rho**2))
+            z_term = ((x_coords - mu_x)**2 / (sigma_x**2)) - \
+                     (2 * rho * (x_coords - mu_x) * (y_coords - mu_y)) / (sigma_x * sigma_y) + \
+                     ((y_coords - mu_y)**2 / (sigma_y**2))
+            term2 = z_term / (2 * (1 - rho**2))
+            nll_loss = (term1 + term2).mean()
+
+            nll_loss_list.append(nll_loss)
 
         # 将预测结果保存为 [B, 51] 格式
         self.prediction = torch.stack(predictions)
@@ -1333,7 +1331,7 @@ class DeformSegmentationModule(nn.Module):
         #self.all_bg_embeddings_predictions = all_bg_embeddings_preds
         self.num_embeddings_per_sample = num_embeddings_per_sample
         
-        return self.prediction, torch.cat(similarity_list), torch.stack(pos_loss_list), torch.stack(sigma_loss_list), torch.stack(rho_loss_list)
+        return self.prediction, torch.cat(similarity_list), torch.stack(nll_loss_list)
 
 
 class LightweightViT(nn.Module):

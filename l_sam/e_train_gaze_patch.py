@@ -28,10 +28,10 @@ from torchmetrics.classification import MulticlassJaccardIndex
 from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 #os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 torch.set_num_threads(5)
 
-task_name = 'T0:10vitgaussian+cls+t0.5+w1,0,10,1000,10+sigma_div100(min0.01)+relpos0+DW0.0001(min100)+l11e-4+l31e-2'
+task_name = 'T1:10-3vitgaussian+cls+t0.5+w1,0,1Newloss+relpos0+DW0.0005(min100)+l11e-4+l31e-2+newloss'
 
 system = platform.system()
 if system == "Windows":
@@ -209,7 +209,7 @@ class EmbeddingClassificationLoss(nn.Module):
         downsampled_mask = downsampled_mask.permute(0, 2, 3, 1)  # [B, H_emb, W_emb, 1]
 
         # 使用模型的 make_prediction 方法基于 mask 进行分类预测
-        predictions, neg_similarity, pos_loss, sigma_loss, rho_loss = model.image_encoder.segmentation_module.make_prediction(downsampled_mask)
+        predictions, neg_similarity, nll_loss = model.image_encoder.segmentation_module.make_prediction(downsampled_mask)
         
         # 获取每个样本中所有embedding的预测结果和数量
         all_fg_predictions = model.image_encoder.segmentation_module.all_fg_embeddings_predictions
@@ -320,11 +320,9 @@ class EmbeddingClassificationLoss(nn.Module):
         loss_regularization = torch.clamp(neg_similarity - margin, min=0.0)
         loss_regularization = loss_regularization.mean()
         
-        loss_pos = pos_loss.mean()
-        loss_sigma = sigma_loss.mean()
-        loss_rho = rho_loss.mean()
+        loss_nll = nll_loss.mean()
         
-        return loss, loss_regularization, loss_pos, loss_sigma, loss_rho
+        return loss, loss_regularization, loss_nll
 
 # 初始化 embedding 分类损失函数
 embedding_cls_loss = EmbeddingClassificationLoss().to(device)
@@ -508,6 +506,7 @@ if __name__ == '__main__':
         #checkpoint_path = os.path.join("/home/external/DynamicFocus_new_ziqi/l_sam_experiment/T3:10vitgaussian+cls+temperature0.5+weight1,0,50,1000,50+sigma_div100+relpos0+DWcheckpoint.pt")
         #efficientsam_ti_custom.load_state_dict(torch.load(checkpoint_path))
 
+        log_idx = 0
         for epoch in trange(num_epochs):
             batch_size = 8
 
@@ -569,22 +568,18 @@ if __name__ == '__main__':
                     #     print(Y_cls_b, file=f)
                     # print(label_bxHxW)
 
-                    embedding_classification_loss, loss_regularization, pos_loss, sigma_loss, rho_loss = embedding_cls_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
+                    embedding_classification_loss, loss_regularization, loss_nll = embedding_cls_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
                     
                     seg_loss = diceloss(pred_bx1KxHxW, label_bxHxW)
                     
                     lambda_embedding = 1  # 可以根据需要调整权重
-                    lambda_regularization = 0 # 可以根据需要调整权重
-                    lambda_pos = 10
-                    lambda_sigma = 1000
-                    lambda_rho = 10
+                    #lambda_regularization = 0 # 可以根据需要调整权重
+                    lambda_nll = 1
 
                     loss = (seg_loss +
                             lambda_embedding * embedding_classification_loss +
-                            lambda_regularization * loss_regularization +
-                            lambda_pos * pos_loss +
-                            lambda_sigma * sigma_loss +
-                            lambda_rho * rho_loss)
+                            #lambda_regularization * loss_regularization +
+                            lambda_nll * loss_nll)
                     if torch.isnan(loss):
                         print(f"\n警告：loss为NaN，已将其设置为0")
                         loss = torch.tensor(0.0, device=loss.device, requires_grad=True)
@@ -593,13 +588,12 @@ if __name__ == '__main__':
                     
                     if bidx % 50 == 0:  # 每50个批次打印一次损失值
                         # 记录各部分损失，便于监控
-                        writer.add_scalar('Loss/seg_loss', seg_loss.item(), bidx)
-                        writer.add_scalar('Loss/embedding_cls_loss', embedding_classification_loss.item(), bidx)
-                        writer.add_scalar('Loss/loss_regularization', loss_regularization.item(), bidx)
-                        writer.add_scalar('Loss/loss_pos', pos_loss.item(), bidx)
-                        writer.add_scalar('Loss/loss_sigma', sigma_loss.item(), bidx)
-                        writer.add_scalar('Loss/loss_rho', rho_loss.item(), bidx)
-                        print(f"\nBatch {bidx}: Seg Loss: {seg_loss.item():.4f}, Embedding Cls Loss: {embedding_classification_loss.item():.4f}, Loss Regularization: {loss_regularization.item():.4f}, Loss Pos: {pos_loss.item()*lambda_pos:.4f}, Loss Sigma: {sigma_loss.item()*lambda_sigma:.4f}, Loss Rho: {rho_loss.item()*lambda_rho:.4f}")
+                        writer.add_scalar('Loss/seg_loss', seg_loss.item(), log_idx)
+                        writer.add_scalar('Loss/embedding_cls_loss', embedding_classification_loss.item(), log_idx)
+                        writer.add_scalar('Loss/loss_regularization', loss_regularization.item(), log_idx)
+                        writer.add_scalar('Loss/loss_nll', loss_nll.item(), log_idx)
+                        log_idx += 1
+                        print(f"\nBatch {bidx}: Seg Loss: {seg_loss.item():.4f}, Embedding Cls Loss: {embedding_classification_loss.item():.4f}, Loss Regularization: {loss_regularization.item():.4f}, Loss NLL: {loss_nll.item():.4f}")
                         token_count_list = efficientsam_ti_custom.image_encoder.segmentation_module.token_count_list
                         if len(token_count_list) > 0:
                             print('\ntoken_mean', np.mean(np.concatenate(token_count_list)), 'token_max', np.max(np.concatenate(token_count_list)), 'token_min', np.min(np.concatenate(token_count_list)))
