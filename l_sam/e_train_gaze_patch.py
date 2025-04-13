@@ -28,10 +28,10 @@ from torchmetrics.classification import MulticlassJaccardIndex
 from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 #os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 torch.set_num_threads(5)
 
-task_name = 'T1:10vitgaussian+cls+temperature0.5+weight1,0,10,1000,10+sigma_div100+relpos0+DW0.0005(min100)+l11e-4+l31e-2'
+task_name = 'T0:10vitgaussian+cls+t0.5+w1,0,10,1000,10+sigma_div100(min0.01)+relpos0+DW0.0001(min100)+l11e-4+l31e-2'
 
 system = platform.system()
 if system == "Windows":
@@ -43,7 +43,7 @@ import torch
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter(log_dir='/workspace/DynamicFocus_new_ziqi/l_sam_experiment')
+writer = SummaryWriter(log_dir=f'/workspace/DynamicFocus_new_ziqi/l_sam_experiment/{task_name}')
 
 from tqdm import trange
 
@@ -590,15 +590,15 @@ if __name__ == '__main__':
                         loss = torch.tensor(0.0, device=loss.device, requires_grad=True)
                     loss_mean.append(loss.item())
                     
-                    # 记录各部分损失，便于监控
-                    writer.add_scalar('Loss/seg_loss', seg_loss.item(), global_step)
-                    writer.add_scalar('Loss/embedding_cls_loss', embedding_classification_loss.item(), global_step)
-                    writer.add_scalar('Loss/loss_regularization', loss_regularization.item(), global_step)
-                    writer.add_scalar('Loss/loss_pos', pos_loss.item(), global_step)
-                    writer.add_scalar('Loss/loss_sigma', sigma_loss.item(), global_step)
-                    writer.add_scalar('Loss/loss_rho', rho_loss.item(), global_step)
                     
                     if bidx % 50 == 0:  # 每50个批次打印一次损失值
+                        # 记录各部分损失，便于监控
+                        writer.add_scalar('Loss/seg_loss', seg_loss.item(), bidx)
+                        writer.add_scalar('Loss/embedding_cls_loss', embedding_classification_loss.item(), bidx)
+                        writer.add_scalar('Loss/loss_regularization', loss_regularization.item(), bidx)
+                        writer.add_scalar('Loss/loss_pos', pos_loss.item(), bidx)
+                        writer.add_scalar('Loss/loss_sigma', sigma_loss.item(), bidx)
+                        writer.add_scalar('Loss/loss_rho', rho_loss.item(), bidx)
                         print(f"\nBatch {bidx}: Seg Loss: {seg_loss.item():.4f}, Embedding Cls Loss: {embedding_classification_loss.item():.4f}, Loss Regularization: {loss_regularization.item():.4f}, Loss Pos: {pos_loss.item()*lambda_pos:.4f}, Loss Sigma: {sigma_loss.item()*lambda_sigma:.4f}, Loss Rho: {rho_loss.item()*lambda_rho:.4f}")
                         token_count_list = efficientsam_ti_custom.image_encoder.segmentation_module.token_count_list
                         if len(token_count_list) > 0:

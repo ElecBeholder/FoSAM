@@ -1220,7 +1220,7 @@ class DeformSegmentationModule(nn.Module):
         selected_feature_map, indices, sample_token_counts, padding_mask = dynamic_topk(
             img_data, 
             saliency_map_BxHxW.detach(), 
-            cut_ratio=0.0005,
+            cut_ratio=0.0001,
             min_tokens=100
         )
         
@@ -1307,11 +1307,11 @@ class DeformSegmentationModule(nn.Module):
             mask_mean_x = x_coords.mean()
             mask_mean_y = y_coords.mean()
             if x_coords.size(0) == 1:
-                mask_sigma_x = 0
-                mask_sigma_y = 0
+                mask_sigma_x = 0.01
+                mask_sigma_y = 0.01
             else:
-                mask_sigma_x = torch.sqrt(x_coords.var())
-                mask_sigma_y = torch.sqrt(y_coords.var())
+                mask_sigma_x = torch.max(torch.sqrt(x_coords.var()), torch.tensor(0.01, device=x_coords.device))
+                mask_sigma_y = torch.max(torch.sqrt(y_coords.var()), torch.tensor(0.01, device=y_coords.device))
             mask_cov = ((x_coords - mask_mean_x) * (y_coords - mask_mean_y)).mean()
             if mask_sigma_x * mask_sigma_y != 0:
                 mask_rho = mask_cov / (mask_sigma_x * mask_sigma_y)
