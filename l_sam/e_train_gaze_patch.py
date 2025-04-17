@@ -28,10 +28,10 @@ from torchmetrics.classification import MulticlassJaccardIndex
 from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 #os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 torch.set_num_threads(5)
 
-task_name = 'T1:10-3vitgaussian+cls+t0.5+w1,0,1Newloss+relpos0+DW0.0005(min100)+l11e-4+l31e-2+newloss'
+task_name = 'T0:5-3vitgaussian+cls+t0.5+w1,0,1Newloss+relpos0+DW0.05(min100)+1e-4+1e-2+cos30+nopretrain+traindata'
 
 system = platform.system()
 if system == "Windows":
@@ -477,7 +477,7 @@ if __name__ == '__main__':
         lr1 = 1e-4
         lr2 = 1e-2
         lr3 = 1e-2
-        num_epochs = 200
+        num_epochs = 100
 
         for name, param in efficientsam_ti_custom.image_encoder.segmentation_module.named_parameters():
             param.requires_grad_(True)
@@ -489,9 +489,10 @@ if __name__ == '__main__':
                 {"params": efficientsam_ti_custom.image_encoder.segmentation_module.parameters(), "lr": lr3},
             ]
         )
-        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.9, patience=2, mode='max', min_lr=1e-6)
-        #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=3, mode='max', min_lr=1e-6)
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15,30,45,60,75,90,105,130,145,160,175], gamma=0.5)
+        #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15,30,45,60,75,90,105,130,145,160,175], gamma=0.5)
+        #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs, eta_min=1e-6)
+        batch_size = 8
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=30*len(dataloader_train.dataset)//batch_size, T_mult=2, eta_min=5e-5)
 
         for name, param in efficientsam_ti_custom.named_parameters():
             print(f"{name}: {param.requires_grad}")
@@ -508,7 +509,6 @@ if __name__ == '__main__':
 
         log_idx = 0
         for epoch in trange(num_epochs):
-            batch_size = 8
 
             optimizer.zero_grad()
             global_step = global_step + 1
@@ -567,13 +567,17 @@ if __name__ == '__main__':
                     #     print(pred_bx1KxHxW.size(), file=f)
                     #     print(Y_cls_b, file=f)
                     # print(label_bxHxW)
+                    mask_bx3xHxW = torch.ge(output_masks_bx1x1xHxW[:, 0, :, :, :], 0)
+                    mask_bx1xHxW = mask_bx3xHxW[:, :1, :, :].to(device=device)
+                    Y_bx1xHxW = Y_bx1xHxW[:, :, :, :].to(device=device)
+                    seg_miou, seg_fg_iou, seg_bg_iou = evaluate_segmentation(mask_bx1xHxW, Y_bx1xHxW)
 
                     embedding_classification_loss, loss_regularization, loss_nll = embedding_cls_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
                     
                     seg_loss = diceloss(pred_bx1KxHxW, label_bxHxW)
                     
                     lambda_embedding = 1  # 可以根据需要调整权重
-                    #lambda_regularization = 0 # 可以根据需要调整权重
+                    #lambda_regularization = 1 # 可以根据需要调整权重
                     lambda_nll = 1
 
                     loss = (seg_loss +
@@ -592,18 +596,22 @@ if __name__ == '__main__':
                         writer.add_scalar('Loss/embedding_cls_loss', embedding_classification_loss.item(), log_idx)
                         writer.add_scalar('Loss/loss_regularization', loss_regularization.item(), log_idx)
                         writer.add_scalar('Loss/loss_nll', loss_nll.item(), log_idx)
+                        writer.add_scalar('lr', scheduler.get_last_lr()[2], log_idx)
                         log_idx += 1
                         print(f"\nBatch {bidx}: Seg Loss: {seg_loss.item():.4f}, Embedding Cls Loss: {embedding_classification_loss.item():.4f}, Loss Regularization: {loss_regularization.item():.4f}, Loss NLL: {loss_nll.item():.4f}")
                         token_count_list = efficientsam_ti_custom.image_encoder.segmentation_module.token_count_list
                         if len(token_count_list) > 0:
                             print('\ntoken_mean', np.mean(np.concatenate(token_count_list)), 'token_max', np.max(np.concatenate(token_count_list)), 'token_min', np.min(np.concatenate(token_count_list)))
                             efficientsam_ti_custom.image_encoder.segmentation_module.token_count_list = []
+                        writer.add_scalar('DynamicWindow/token_mean', np.mean(np.concatenate(token_count_list)), log_idx)
+                        writer.add_scalar('training_seg_miou', np.array(seg_fg_iou).mean(), log_idx)
 
                     optimizer.zero_grad()
                     loss.backward()
                     # for name, param in efficientsam_ti_custom.named_parameters():
                     #     print(f"{name} grad: {param.grad is not None}")
                     optimizer.step()
+                    scheduler.step()
 
                 writer.add_scalar('Loss_cls_train', np.array(loss_mean).mean(), global_step)
 
@@ -643,7 +651,7 @@ if __name__ == '__main__':
                     ks = []
                     loss_mean = []
 
-                    for bidx, bparts in enumerate(dataloader_valid.get_iterator(batch_size=8, device=torch.device("cpu"), shuffle=True, xrange=range)):
+                    for bidx, bparts in enumerate(dataloader_valid.get_iterator(batch_size=8, device=torch.device("cpu"), shuffle=False, xrange=range)):
                         X_bx4xHxW, F_bx2, Y_bx1xHxW, Y_cls_bx1 = bparts
                         X_bx4xHxW = avg_pool(X_bx4xHxW)
                         Y_bx1xHxW = max_pool(Y_bx1xHxW)
@@ -664,12 +672,9 @@ if __name__ == '__main__':
                             for i in range(8):
                                 import matplotlib.pyplot as plt
                                 arr = image_bx3xHxW[i,0,:,:].cpu().numpy()
-                                plt.imsave('../l_sam_experiment/{}_{}_img.png'.format(task_name,i), arr, cmap='gray')
+                                plt.imsave('../l_sam_experiment/{}_{}_{}_img.png'.format(task_name,i,bidx), arr, cmap='gray')
                                 arr = Y_bx1xHxW[i,0,:,:].cpu().numpy()
-                                plt.imsave('../l_sam_experiment/{}_{}_mask.png'.format(task_name,i), arr, cmap='gray')
-                                arr = torch.zeros(40, 40)
-                                arr[input_points_bx1xNx2[i,0,0,1].cpu().numpy()//16, input_points_bx1xNx2[i,0,0,0].cpu().numpy()//16] = 1
-                                plt.imsave('../l_sam_experiment/{}_{}_point.png'.format(task_name,i), arr, cmap='gray')
+                                plt.imsave('../l_sam_experiment/{}_{}_{}_mask.png'.format(task_name,i,bidx), arr, cmap='gray')
                         # wang ----------------
 
                         output_masks_bx1x1xHxW, cls_predictions_bx1xK, iou_predictions_bx1x1 = efficientsam_ti_custom(
@@ -682,7 +687,7 @@ if __name__ == '__main__':
                         if bidx % 100 == 0:
                             for i in range(8):
                                 arr = output_masks_bx1x1xHxW[i,0,0,:,:].cpu().numpy()
-                                plt.imsave('../l_sam_experiment/{}_{}_outputmask.png'.format(task_name,i), arr, cmap='gray')
+                                plt.imsave('../l_sam_experiment/{}_{}_{}_outputmask.png'.format(task_name,i,bidx), arr, cmap='gray')
                         # wang ----------------
 
                         
@@ -694,7 +699,7 @@ if __name__ == '__main__':
                         if bidx % 100 == 0:
                             for i in range(8):
                                 arr = mask_bx1xHxW[i,0,:,:].cpu().numpy()
-                                plt.imsave('../l_sam_experiment/{}_{}_outputmask_t.png'.format(task_name,i), arr, cmap='gray')
+                                plt.imsave('../l_sam_experiment/{}_{}_{}_outputmask_t.png'.format(task_name,i,bidx), arr, cmap='gray')
                         # wang ----------------
 
                         # Evaluate segmentation with updated mIoU calculation
@@ -738,10 +743,11 @@ if __name__ == '__main__':
                     mean_cls_foreground_miou = sum([miou * bsize for miou, bsize in cls_overall_miou_bsize_s]) / sum([bsize for miou, bsize in cls_overall_miou_bsize_s])
 
                     #scheduler.step(mean_cls_foreground_miou.item())
-                    scheduler.step()
+                    #scheduler.step()
 
                     writer.add_scalar('Loss_cls_val', np.array(loss_mean).mean(), global_step)
-                    writer.add_scalar('lr', scheduler.get_last_lr()[0], global_step)
+                    #writer.add_scalar('lr', scheduler.get_last_lr()[0], global_step)
+                    writer.add_scalar('fg_miou', mean_seg_fg_iou.item(), global_step)
 
                     predictions = torch.argmax(torch.cat(cls_predictions_bx1xK_s, dim=0).squeeze(1), dim=1).detach().to('cuda') 
                     targets = torch.cat(Y_cls_bx1_s, dim=0).squeeze(1).detach().T.to('cuda') 
