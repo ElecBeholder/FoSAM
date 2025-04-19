@@ -29,12 +29,12 @@ import platform
 
 
 # elif pc_name == PC_NAME_server_H100 or pc_name == PC_NAME_server_4090:
-dpath_training_records = r'/workspace/b_data_train/a_records_train'
+dpath_training_records = r'/home/xth/a_records_train'
 
-dpath_data_raw = r'/workspace/b_data_train/data_a_raw'
-dpath_data_cache = r'/workspace/b_data_train/data_b_cache'
-dpath_data_cook = r'/workspace/b_data_train/data_c_cook'
-dpath_esam_weights = r'/workspace/l_sam/esam_weight'
+dpath_data_raw = r'/mnt/extdisk/share_data/DriverD/b_data_train/data_a_raw'
+dpath_data_cache = r'/mnt/extdisk/share_data/DriverD/b_data_train/data_b_cache'
+dpath_data_cook = r'/mnt/extdisk/share_data/DriverD/b_data_train/data_c_cook'
+dpath_esam_weights = r'/home/xth/sam/DynamicFocus_new_ziqi/l_sam/esam_weight'
 #dpath_sam_checkpoints = r'/root/autodl-tmp/h_project/sam/checkpoints'
 
 # dpath_data_raw_cityscape_X = os.path.join(dpath_data_raw, r'leftImg8bit_trainvaltest', r'leftImg8bit')
@@ -49,5 +49,7 @@ fpath_data_raw_lvis_valid = os.path.join(dpath_data_raw, r'lvis_v1_val', r'lvis_
 dpath_data_raw_coco_train = os.path.join(dpath_data_raw, r'coco2017', r'train2017')
 dpath_data_raw_coco_valid = os.path.join(dpath_data_raw, r'coco2017', r'val2017')
 dpath_data_raw_coco_test = os.path.join(dpath_data_raw, r'coco2017', r'test2017')
+
+dpath_data_raw_ade20k = os.path.join(dpath_data_raw, r'ADE20K_2021_17_01')
 
 os.makedirs(dpath_training_records, exist_ok=True)

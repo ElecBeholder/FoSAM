@@ -33,29 +33,29 @@ from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import math
 
-class myPatchEmbed(nn.Module):
-    """2D Image to Patch Embedding"""
-
-    def __init__(
-            self,
-            img_size,
-            patch_size,
-            in_chans,
-            embed_dim,
-    ):
-        super().__init__()
-        self.proj = nn.Conv2d(
-            in_chans,
-            embed_dim,
-            kernel_size=(patch_size, patch_size),
-            stride=(patch_size, patch_size),
-            bias=True,
-        )
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-        x = self.proj(x)
-        return x
+#class myPatchEmbed(nn.Module):
+#    """2D Image to Patch Embedding"""
+#
+#    def __init__(
+#            self,
+#            img_size,
+#            patch_size,
+#            in_chans,
+#            embed_dim,
+#    ):
+#        super().__init__()
+#        self.proj = nn.Conv2d(
+#            in_chans,
+#            embed_dim,
+#            kernel_size=(patch_size, patch_size),
+#            stride=(patch_size, patch_size),
+#            bias=True,
+#        )
+#
+#    def forward(self, x):
+#        B, C, H, W = x.shape
+#        x = self.proj(x)
+#        return x
 
 
 class GaussianPredictor_old(nn.Module):
@@ -1146,7 +1146,7 @@ class DeformSegmentationModule(nn.Module):
     def __init__(self, cfg):
         super(DeformSegmentationModule, self).__init__()
         # 使用轻量级 ViT 作为 backbone
-        self.backbone = LightweightViT(dim=384, depth=5, heads=3)
+        self.backbone = LightweightViT(dim=384, depth=3, heads=3)
         
         # 保留原来的网格大小设置
         self.grid_size_x = 20
@@ -1155,8 +1155,8 @@ class DeformSegmentationModule(nn.Module):
         self.padding_size_x = 10
         
         # 分类器用于51类分类
-        self.patch_embed = myPatchEmbed(640, 16, 3, 384)
-        self.pos_embed = nn.Parameter(torch.zeros(1, 384, 40, 40))
+        #self.patch_embed = myPatchEmbed(640, 16, 3, 384)
+        #self.pos_embed = nn.Parameter(torch.zeros(1, 384, 40, 40))
         self.classifier = nn.Linear(384, 51)
         self.gaussian_predictor = nn.Linear(384, 5)
         self.dropout = nn.Dropout(0.1)
@@ -1179,10 +1179,10 @@ class DeformSegmentationModule(nn.Module):
         
         # 1. 使用 backbone 提取特征
         # 注意：img_data 已经添加了位置编码，直接传入
-        #embeddings = self.backbone(img_data)  # [B, 40, 40, 384]
-        img_patch = self.patch_embed(img_original)
-        img_patch = img_patch + self.pos_embed
-        embeddings = self.backbone(img_patch)  # [B, 40, 40, 384]
+        embeddings = self.backbone(img_data)  # [B, 40, 40, 384]
+        #img_patch = self.patch_embed(img_original)
+        #img_patch = img_patch + self.pos_embed
+        #embeddings = self.backbone(img_patch)  # [B, 40, 40, 384]
         #embeddings = embeddings / (embeddings.norm(dim=3, keepdim=True) + 1e-6)
         self.embeddings = embeddings  # 保存 embeddings 供后续使用
         
@@ -1250,7 +1250,7 @@ class DeformSegmentationModule(nn.Module):
         selected_feature_map, indices, sample_token_counts, padding_mask = dynamic_topk(
             img_data, 
             saliency_map_BxHxW.detach(), 
-            cut_ratio=0.05,
+            cut_ratio=0.01,
             min_tokens=100
         )
         

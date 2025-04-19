@@ -71,8 +71,8 @@ class PreprocessADE:
         self.dataset_partition = dataset_partition
 
         self.fdatasetname = 'ade20k'
-        self.crop_H = 512
-        self.crop_W = 512
+        self.crop_H = 640
+        self.crop_W = 640
         self.HD = self.crop_H
         self.WD = self.crop_W
         self.K = len(ade_class_ids)
@@ -247,8 +247,8 @@ class DatasetADE(AbstractDataset):
 
     def __init__(self, marker, dataset_partition='train'):
         super().__init__()
-        self.HC = 512
-        self.WC = 512
+        self.HC = 640
+        self.WC = 640
         self.K = len(ade_class_ids)
 
         self.fdatasetname = 'ade20k'
@@ -321,7 +321,7 @@ def get_Skwargs():
     # for speed_test
     parser.add_argument('--epoch', type=int, required=False, default=10, help='Number of training epochs')
     parser.add_argument('--batch_size', type=int, required=False, default=64, help='Size of each training batch')
-    parser.add_argument('--HW_size', type=int, required=False, default=512, help='Size of each training batch')
+    parser.add_argument('--HW_size', type=int, required=False, default=640, help='Size of each training batch')
 
     parser.add_argument('--target_device', type=str, required=False, default='gpu', help='Device to use for training (e.g., cpu, gpu)')
     parser.add_argument('--cache', action='store_true', help='Whether to cache the dataset in memory for faster access')
@@ -424,9 +424,9 @@ if __name__ == '__main__':
 
 """
 
-python e_preprocess_scripts/b4_preprocess_ade20k.py --task preprocess --dataset_partition train valid --sample_num 60000 --HW_size 512 --marker_prefix sp512_
+python e_preprocess_scripts/b4_preprocess_ade20k.py --task preprocess --dataset_partition train valid --sample_num 60000 --HW_size 640 --marker_prefix sp640_
 
-python e_preprocess_scripts/b4_preprocess_ade20k.py --task speed_test --dataset_partition train --sample_num 100 --HW_size 512 --marker_prefix sp512_
+python e_preprocess_scripts/b4_preprocess_ade20k.py --task speed_test --dataset_partition train --sample_num 100 --HW_size 640 --marker_prefix sp640_
 
 
 on local

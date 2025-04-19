@@ -28,10 +28,10 @@ from torchmetrics.classification import MulticlassJaccardIndex
 from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 #os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 torch.set_num_threads(5)
 
-task_name = 'T0:5-3vitgaussian+cls+t0.5+w1,0,1Newloss+relpos0+DW0.05(min100)+1e-4+1e-2+cos30+nopretrain+traindata'
+task_name = 'T1:3-3vitgaussian+cls+t0.5+w1,0,1Newloss+relpos0+DW0.01(min100)+1e-4+1e-2+cos30'
 
 system = platform.system()
 if system == "Windows":
@@ -43,13 +43,14 @@ import torch
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter(log_dir=f'/workspace/DynamicFocus_new_ziqi/l_sam_experiment/{task_name}')
+writer = SummaryWriter(log_dir=f'/home/xth/sam/DynamicFocus_new_ziqi_4_18/l_sam_experiment/{task_name}')
 
 from tqdm import trange
 
 from e_preprocess_scripts.a_preprocess_tools import CustomDataLoader
 from e_preprocess_scripts.b2_preprocess_lvis import DatasetLVIS, PreprocessLVIS
 from e_preprocess_scripts.b3_preprocess_cityscapes import wrap_name, DatasetCityScapes, PreprocessCityscapes
+from e_preprocess_scripts.b4_preprocess_ade20k import DatasetADE, PreprocessADE
 
 # select the device for computation
 if torch.cuda.is_available():
@@ -329,7 +330,8 @@ embedding_cls_loss = EmbeddingClassificationLoss().to(device)
 
 if __name__ == '__main__':
 
-    old_state_dict = torch.load("/workspace/DynamicFocus_new_ziqi/l_sam/efficient_sam_vits.singlemask.pt")['model']
+    old_state_dict = torch.load("/home/xth/sam/DynamicFocus_new_ziqi/l_sam/esam_weight/efficient_sam_vits.singlemask.pt")['model']
+    old_state_dict = None
     # old_state_dict = torch.load("/root/autodl-tmp/DynamicFocus/l_sam/efficient_sam_vits.pt")
 
     # # copy mask 1 to 0
@@ -381,7 +383,7 @@ if __name__ == '__main__':
 
 
     if True:
-        mode = 'lvis'
+        mode = 'ade'
 
         avg_pool = nn.Identity()
         max_pool = nn.Identity()
@@ -424,6 +426,40 @@ if __name__ == '__main__':
 
             get_name = lambda k: wrap_name(pplv_train.id2catyinfo[cids_monitored[k]]['name'])
 
+        elif mode == 'ade':
+            downsample_factor = 1
+            HW_RAW_SIZE = 640
+            # class_num = 58
+            class_num = 51
+            HW_image_input_size = 640
+            avg_pool = nn.AvgPool2d(kernel_size=downsample_factor, stride=downsample_factor) if downsample_factor > 1 else nn.Identity()
+            max_pool = nn.MaxPool2d(kernel_size=downsample_factor, stride=downsample_factor) if downsample_factor > 1 else nn.Identity()
+
+            # if preset.pc_name != 'XPS':
+            # dataset_train = DatasetLVIS('sp60000', dataset_partition='train')
+            # dataloader_train = CustomDataLoader(dataset_train, xrange=trange, cache=False)
+            # dataset_valid = DatasetLVIS('sp12000', dataset_partition='valid')
+            # dataloader_valid = CustomDataLoader(dataset_valid, xrange=trange, cache=False)
+            #dataset_train = DatasetLVIS('sp20000', dataset_partition='train')
+            #dataloader_train = CustomDataLoader(dataset_train, xrange=trange, cache=False)
+            #dataset_valid = DatasetLVIS('sp4000', dataset_partition='valid')
+            #dataloader_valid = CustomDataLoader(dataset_valid, xrange=trange, cache=False)
+            #dataset_train = DatasetLVIS('sp640_60000_sam_vit_b', dataset_partition='train')
+            dataset_train = DatasetADE('sp640_60000', dataset_partition='train')
+            dataloader_train = CustomDataLoader(dataset_train, xrange=trange, cache=False)
+            #dataset_valid = DatasetLVIS('sp640_12000_sam_vit_b', dataset_partition='valid')
+            dataset_valid = DatasetADE('sp640_12000', dataset_partition='valid')
+            dataloader_valid = CustomDataLoader(dataset_valid, xrange=trange, cache=False)
+            # else:
+            #     dataset_train = DatasetLVIS('sp640_1000', dataset_partition='train')
+            #     dataloader_train = CustomDataLoader(dataset_train, xrange=trange, cache=False)
+            #     dataset_valid = DatasetLVIS('sp640_200', dataset_partition='valid')
+            #     dataloader_valid = CustomDataLoader(dataset_valid, xrange=trange, cache=False)
+            # pplv_train = PreprocessLVIS(dataset_partition='train')
+            # # cids_monitored = pplv_train.get_cids_monitored(take_num_class=57)
+            # cids_monitored = pplv_train.get_cids_monitored(take_num_class=50)
+
+            # get_name = lambda k: wrap_name(pplv_train.id2catyinfo[cids_monitored[k]]['name'])
         elif mode == 'cityscapes':
 
             downsample_factor = 1
@@ -650,6 +686,8 @@ if __name__ == '__main__':
                     cls_fs_s = []
                     ks = []
                     loss_mean = []
+                    loss_cls_list = []
+                    loss_nll_list = []
 
                     for bidx, bparts in enumerate(dataloader_valid.get_iterator(batch_size=8, device=torch.device("cpu"), shuffle=False, xrange=range)):
                         X_bx4xHxW, F_bx2, Y_bx1xHxW, Y_cls_bx1 = bparts
@@ -682,6 +720,11 @@ if __name__ == '__main__':
                             input_points_bx1xNx2,
                             input_labels_bx1xN,
                         )
+                        Y_cls_b = Y_cls_bx1.squeeze(1).to(device=device)
+                        cur_Y_bx1xHxW = Y_bx1xHxW[:, :, :, :].to(device=device)
+                        embedding_classification_loss, loss_regularization, loss_nll = embedding_cls_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
+                        loss_cls_list.append(embedding_classification_loss.item())
+                        loss_nll_list.append(loss_nll.item())
 
                         # wang ----------------
                         if bidx % 100 == 0:
@@ -748,6 +791,8 @@ if __name__ == '__main__':
                     writer.add_scalar('Loss_cls_val', np.array(loss_mean).mean(), global_step)
                     #writer.add_scalar('lr', scheduler.get_last_lr()[0], global_step)
                     writer.add_scalar('fg_miou', mean_seg_fg_iou.item(), global_step)
+                    writer.add_scalar('Loss/loss_cls_val', np.array(loss_cls_list).mean(), global_step)
+                    writer.add_scalar('Loss/loss_nll_val', np.array(loss_nll_list).mean(), global_step)
 
                     predictions = torch.argmax(torch.cat(cls_predictions_bx1xK_s, dim=0).squeeze(1), dim=1).detach().to('cuda') 
                     targets = torch.cat(Y_cls_bx1_s, dim=0).squeeze(1).detach().T.to('cuda') 
@@ -790,7 +835,7 @@ if __name__ == '__main__':
                         print(0.5 * mean_cls_foreground_miou.cpu().numpy().item() + 0.5 * mean_seg_bg_iou.item(), file=f)
                     
                     # 保存模型
-                    checkpoint_path = os.path.join('/workspace/DynamicFocus_new_ziqi/l_sam_experiment', task_name + "checkpoint.pt")
+                    checkpoint_path = os.path.join('/home/xth/sam/DynamicFocus_new_ziqi_4_18/l_sam_experiment', task_name + "checkpoint.pt")
                     torch.save(efficientsam_ti_custom.state_dict(), checkpoint_path)
                     print(f"model saved to: {checkpoint_path}")
                     
