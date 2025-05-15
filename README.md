@@ -1,6 +1,6 @@
 # FoSAM: Foveated Segment Anything Model
 
-This repository contains the official implementation of the paper "Foveated Segment Anything Model" (FoSAM) accepted at NeurIPS 2025.
+This repository contains the official implementation of the paper "Foveated Segment Anything Model" (FoSAM).
 
 ## Abstract
 
@@ -8,7 +8,7 @@ Augmented Reality (AR) encompasses transformative technologies that are redefini
 
 ## Demo Video
 
-A demonstration of FoSAM in action:
+A demonstration of FoSAM in User Study:
 
 ![FoSAM Demo](assets/demo.gif)
 
@@ -58,19 +58,6 @@ FoSAM achieves latencies well below the 30ms threshold required for seamless AR 
 ## User Study
 
 Our user study involving 7 participants showed that FoSAM was preferred in 96.9%±4.8% of trials over traditional SAM, demonstrating the real-world benefits of our approach for AR applications.
-
-## Citation
-
-If you find our work useful in your research, please consider citing:
-
-```bibtex
-@inproceedings{fosam2025,
-  title={Foveated Segment Anything Model},
-  author={Hippocampus, David S.},
-  booktitle={Advances in Neural Information Processing Systems},
-  year={2025}
-}
-```
 
 ## License
 
