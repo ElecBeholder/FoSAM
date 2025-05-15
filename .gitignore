@@ -1,4 +1,5 @@
-# 忽略l_sam_experiment文件夹下的所有文件
 /l_sam_experiment/
 /l_sam_experiment/*
 *.pyc
+*.pt
+*.pth
