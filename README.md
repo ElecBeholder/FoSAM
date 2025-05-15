@@ -10,11 +10,11 @@ Augmented Reality (AR) encompasses transformative technologies that are redefini
 
 A demonstration of FoSAM in action:
 
-<video src="./assets/demo.mp4" controls></video>
+![FoSAM Demo](assets/demo.gif)
 
 ## Framework Overview
 
-![FoSAM Architecture](./fosam_fig.pdf)
+![FoSAM Architecture](assets/fosam_fig.png)
 
 FoSAM significantly reduces the computational requirements of image segmentation in AR environments by focusing processing only on areas where the user is looking. The framework leverages natural human eye behavior to prioritize segmentation on the instance of interest (IOI) while ignoring peripheral regions.
 
