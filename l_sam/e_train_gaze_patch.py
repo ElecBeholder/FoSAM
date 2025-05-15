@@ -28,10 +28,10 @@ from torchmetrics.classification import MulticlassJaccardIndex
 from pytorch_toolbelt.losses.dice import DiceLoss
 from l_sam.forveated_sam.efficient_sam_encoder_saliency import average_pool, get_merge_map_edge, get_merge_map_object
 #os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ['CUDA_VISIBLE_DEVICES'] = "1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 torch.set_num_threads(5)
 
-task_name = 'T1:3-3vitgaussian+cls+t0.5+w1,0,1Newloss+relpos0+DW0.01(min100)+1e-4+1e-2+cos30'
+task_name = '2l-ds160-50-05'
 
 system = platform.system()
 if system == "Windows":
@@ -43,7 +43,7 @@ import torch
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter(log_dir=f'/home/xth/sam/DynamicFocus_new_ziqi_4_18/l_sam_experiment/{task_name}')
+writer = SummaryWriter(log_dir=f'/home/wang/FoSAM/l_sam_experiment/{task_name}')
 
 from tqdm import trange
 
@@ -197,10 +197,11 @@ class EmbeddingClassificationLoss(nn.Module):
         
         # 获取模型中的 embeddings，形状为 [B, H, W, C]
         embeddings = model.image_encoder.segmentation_module.embeddings
-        
+        #pdb.set_trace()
         # 对 mask 进行下采样以匹配 embedding map 的大小
         ds_factor_h = H // embeddings.shape[1]
         ds_factor_w = W // embeddings.shape[2]
+        ts = embeddings.shape[1]
         
         # 使用平均池化来下采样 mask
         downsampled_mask = F.avg_pool2d(mask, kernel_size=(ds_factor_h, ds_factor_w), 
@@ -266,7 +267,7 @@ class EmbeddingClassificationLoss(nn.Module):
                 # 获取预测和真实类别
                 pred_class = torch.argmax(predictions[b]).item()
                 true_class = class_label[b].item()
-                all_score4true = F.softmax(all_embeddings_predictions[b], dim=1)[:, true_class].view(40, 40)
+                all_score4true = F.softmax(all_embeddings_predictions[b], dim=1)[:, true_class].view(ts, ts)
 
                 # 可视化预测的 saliency map
                 if hasattr(model.image_encoder.segmentation_module, 'xs') and model.image_encoder.segmentation_module.xs is not None:
@@ -330,8 +331,7 @@ embedding_cls_loss = EmbeddingClassificationLoss().to(device)
 
 if __name__ == '__main__':
 
-    old_state_dict = torch.load("/home/xth/sam/DynamicFocus_new_ziqi/l_sam/esam_weight/efficient_sam_vits.singlemask.pt")['model']
-    old_state_dict = None
+    old_state_dict = torch.load("/home/wang/FoSAM/l_sam/efficient_sam_vits.singlemask.pt")['model']
     # old_state_dict = torch.load("/root/autodl-tmp/DynamicFocus/l_sam/efficient_sam_vits.pt")
 
     # # copy mask 1 to 0
@@ -383,7 +383,7 @@ if __name__ == '__main__':
 
 
     if True:
-        mode = 'ade'
+        mode = 'lvis'
 
         avg_pool = nn.Identity()
         max_pool = nn.Identity()
@@ -820,7 +820,7 @@ if __name__ == '__main__':
                     print(0.5 * mean_cls_foreground_miou.cpu().numpy().item() + 0.5 * mean_seg_bg_iou.item())
                     # print(df[df['label'] == 'MEAN'])
 
-                    with open('learning_to_downsample_ziqi.txt', 'a', encoding='utf-8') as f:
+                    with open(f'{task_name}.txt', 'a', encoding='utf-8') as f:
                         # print(targets.tolist(), file=f)
                         print("lvis")
                         print("mean_seg_miou", file=f)
@@ -835,8 +835,8 @@ if __name__ == '__main__':
                         print(0.5 * mean_cls_foreground_miou.cpu().numpy().item() + 0.5 * mean_seg_bg_iou.item(), file=f)
                     
                     # 保存模型
-                    checkpoint_path = os.path.join('/home/xth/sam/DynamicFocus_new_ziqi_4_18/l_sam_experiment', task_name + "checkpoint.pt")
+                    checkpoint_path = os.path.join('/home/wang/FoSAM/l_sam/l_sam_experiment', task_name + "checkpoint.pt")
                     torch.save(efficientsam_ti_custom.state_dict(), checkpoint_path)
                     print(f"model saved to: {checkpoint_path}")
                     
-                    optimizer.step()
+                    #optimizer.step()

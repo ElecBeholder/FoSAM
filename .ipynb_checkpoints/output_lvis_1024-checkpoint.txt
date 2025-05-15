@@ -1,3 +1,0 @@
-lvis
-  label  seg_miou  seg_fg_iou  seg_bg_iou
-0  MEAN  0.574714    0.210999     0.93843

@@ -30,7 +30,7 @@ np.random.seed(0)
 import torchvision.transforms as transforms
 
 from PIL import Image
-
+import pdb
 
 def get_marker(N, marker_prefix):
     return f'{marker_prefix}{N}'
@@ -94,6 +94,7 @@ class PreprocessADE:
     def pad_or_crop_image(self, image, mask, target_size, coord):
         H, W = target_size
         h, w = coord
+        #pdb.set_trace()
 
         # Get original size
         original_width, original_height = image.size
@@ -103,8 +104,10 @@ class PreprocessADE:
             raise ValueError("Coordinate (h, w) must be within the bounds of the image.")
 
         gray_image = Image.new("L", (original_width, original_height), 255)
-        if original_width < W or original_height < H:
+        if original_width < W and original_height < H:
             # Pad the image
+            #pdb.set_trace()
+            pad = True
             padding = (
                 max(0, W - original_width),  # Right
                 max(0, H - original_height)  # Bottom
@@ -125,35 +128,45 @@ class PreprocessADE:
             # Update new (x, y) coordinates in the padded image
             new_h = h
             new_w = w
+            new_w_in_crop = new_w
+            new_h_in_crop = new_h
+            cropped_gray_image = gray_image
+            cropped_mask = mask
+            cropped_image = image
+            if new_w_in_crop > 640 or new_h_in_crop > 640:
+                pdb.set_trace()
         else:
+            pad = False
             new_h, new_w = h, w  # No change in coordinates if no padding
 
-        # Now randomly crop the padded or original image
-        original_width, original_height = image.size  # Update sizes after padding if needed
+            # Now randomly crop the padded or original image
+            original_width, original_height = image.size  # Update sizes after padding if needed
 
-        # Calculate valid ranges for the top-left corner of the crop
-        half_h, half_w = H // 2, W // 2
-        left_min = max(0, w - half_w)
-        left_max = min(original_width - W, w)
-        top_min = max(0, h - half_h)
-        top_max = min(original_height - H, h)
+            # Calculate valid ranges for the top-left corner of the crop
+            half_h, half_w = H // 2, W // 2
+            left_min = max(0, w - half_w)
+            left_max = min(original_width - W, w)
+            top_min = max(0, h - half_h)
+            top_max = min(original_height - H, h)
 
-        # Ensure the crop doesn't go out of bounds
-        left = random.randint(left_min, left_max) if left_max >= left_min else left_min
-        top = random.randint(top_min, top_max) if top_max >= top_min else top_min
+            # Ensure the crop doesn't go out of bounds
+            left = random.randint(left_min, left_max) if left_max >= left_min else left_min
+            top = random.randint(top_min, top_max) if top_max >= top_min else top_min
 
-        # Define the crop box
-        crop_box = (left, top, left + W, top + H)
+            # Define the crop box
+            crop_box = (left, top, left + W, top + H)
 
-        # Crop the image
-        cropped_image = image.crop(crop_box)
-        cropped_mask = mask.crop(crop_box)
-        cropped_gray_image = gray_image.crop(crop_box)
-        # Calculate the new coordinates of (x, y) in the cropped image
-        new_w_in_crop = new_w - left
-        new_h_in_crop = new_h - top
+            # Crop the image
+            cropped_image = image.crop(crop_box)
+            cropped_mask = mask.crop(crop_box)
+            cropped_gray_image = gray_image.crop(crop_box)
+            # Calculate the new coordinates of (x, y) in the cropped image
+            new_w_in_crop = new_w - left
+            new_h_in_crop = new_h - top
+            # if new_w_in_crop == 320 or new_h_in_crop == 320:
+            #     pdb.set_trace()
 
-        return cropped_image, cropped_mask, new_h_in_crop, new_w_in_crop, cropped_gray_image
+        return cropped_image, cropped_mask, new_h_in_crop, new_w_in_crop, cropped_gray_image, pad
 
     def prep_a_sample_by_class_id_image_id(self, target_class_id, img_id, mark: str = 'default'):
         class_name = self.info['objectnames'][target_class_id]
@@ -192,10 +205,13 @@ class PreprocessADE:
         view_rgb_3xHxW = load_image(full_img_path)
 
         view_rgb_pil = transforms.ToPILImage()(view_rgb_3xHxW)
+        w_temp, h_temp = view_rgb_pil.size
+        if w_temp < 400 or h_temp < 400:
+            return
         labelidx_tracker_pil = instance_mask_binary
         target_size = (self.HD, self.WD)
         coord = (idx_H, idx_W)
-        cropped_image_pil, cropped_labelidx_pil, idx_HS, idx_WS, alpha_mask_image = self.pad_or_crop_image(view_rgb_pil, labelidx_tracker_pil, target_size, coord)
+        cropped_image_pil, cropped_labelidx_pil, idx_HS, idx_WS, alpha_mask_image, pad = self.pad_or_crop_image(view_rgb_pil, labelidx_tracker_pil, target_size, coord)
 
         view_rgb_3xHPxWP = transforms.ToTensor()(cropped_image_pil)
         labelidx_1xHPxWP = transforms.ToTensor()(cropped_labelidx_pil)
@@ -207,9 +223,10 @@ class PreprocessADE:
         class_name = class_name.replace(', ', '-')
 
         if not (0 <= idx_HS < self.HD and 0 <= idx_WS < self.WD):
+            pdb.set_trace()
             raise ValueError(f"Adjusted index ({idx_HS}, {idx_WS},{self.HD},{self.WD}) is out of bounds after cropping.")
 
-        save_image(XY_rgba_4xHPxWP, os.path.join(self.path_data_cook_ade20k_part, mark, f'{class_name}_c{target_class_idx}_k{target_class_idx}_{img_id}_{idx_HS}x{idx_WS}_{str_tensor_shape(XY_rgba_4xHPxWP)}.uint8.XY.png'))
+        save_image(XY_rgba_4xHPxWP, os.path.join(self.path_data_cook_ade20k_part, mark, f'{class_name}_c{target_class_idx}_k{target_class_idx}_{img_id}_{idx_HS}x{idx_WS}_{str_tensor_shape(XY_rgba_4xHPxWP)}_pad{pad}.uint8.XY.png'))
 
     def prep_N_samples_per_class(self, class_id, samples_per_class, mark):
         if self.dataset_partition == 'train':

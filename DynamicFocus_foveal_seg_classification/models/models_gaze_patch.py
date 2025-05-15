@@ -1146,7 +1146,7 @@ class DeformSegmentationModule(nn.Module):
     def __init__(self, cfg):
         super(DeformSegmentationModule, self).__init__()
         # 使用轻量级 ViT 作为 backbone
-        self.backbone = LightweightViT(dim=384, depth=3, heads=3)
+        self.backbone = LightweightViT(dim=384, depth=2, heads=3)
         
         # 保留原来的网格大小设置
         self.grid_size_x = 20
@@ -1174,21 +1174,28 @@ class DeformSegmentationModule(nn.Module):
         
         self.token_count_list = []
     
-    def forward(self, img_data, img_original, focus_point, s_bin_selected_BxHMxWMx1=None, segSize=None):
+    def forward(self, img_data, img_data_ds, img_original, focus_point, s_bin_selected_BxHMxWMx1=None, segSize=None):
         batch_size = img_data.shape[0]
         
         # 1. 使用 backbone 提取特征
         # 注意：img_data 已经添加了位置编码，直接传入
-        embeddings = self.backbone(img_data)  # [B, 40, 40, 384]
+        embeddings = self.backbone(img_data_ds)  # [B, 40, 40, 384]
+
+        # from thop import profile
+        # print('img_data.shape', img_data_ds.shape)
+        # flops, params = profile(self.backbone, inputs=(img_data_ds,))
+        # print(f"GMACs: {flops / 1e9:.4f} GMACs, Params: {params / 1e6:.4f} M") #3G, 15M
+
         #img_patch = self.patch_embed(img_original)
         #img_patch = img_patch + self.pos_embed
         #embeddings = self.backbone(img_patch)  # [B, 40, 40, 384]
         #embeddings = embeddings / (embeddings.norm(dim=3, keepdim=True) + 1e-6)
         self.embeddings = embeddings  # 保存 embeddings 供后续使用
-        
+        ts = embeddings.shape[1]
+        #pdb.set_trace()
         # 2. 计算 saliency map
         # 将注视点坐标转换为网格索引，正确映射 x 和 y 坐标
-        H, W = 40, 40
+        H, W = ts, ts
         focus_x = torch.clamp((focus_point[:, 0, 0, 0] / 640 * W).long(), 0, W-1)  # x 坐标
         focus_y = torch.clamp((focus_point[:, 0, 0, 1] / 640 * H).long(), 0, H-1)  # y 坐标
         
@@ -1236,6 +1243,14 @@ class DeformSegmentationModule(nn.Module):
         z_y1 = (yy - mu_y) / sigma_y
         exponent = (z_x1**2 - 2 * rho * z_x1 * z_y1 + z_y1**2) / (2 * (1 - rho**2))
         saliency_map_BxHxW = norm_const * torch.exp(-exponent)
+
+        # 上采样到 40x40
+        saliency_map_BxHxW = F.interpolate(
+            saliency_map_BxHxW.unsqueeze(1),  # [B, 1, H, W]
+            size=(40, 40),
+            mode='bilinear',
+            align_corners=False
+        ).squeeze(1)  # [B, 40, 40]
             
         self.xs = saliency_map_BxHxW
         self.focus_embedding = focus_embedding
@@ -1250,8 +1265,8 @@ class DeformSegmentationModule(nn.Module):
         selected_feature_map, indices, sample_token_counts, padding_mask = dynamic_topk(
             img_data, 
             saliency_map_BxHxW.detach(), 
-            cut_ratio=0.01,
-            min_tokens=100
+            cut_ratio=0.5,
+            min_tokens=50
         )
         
         self.token_count_list.append(sample_token_counts.detach().cpu().numpy())

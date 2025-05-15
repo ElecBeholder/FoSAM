@@ -324,8 +324,10 @@ class ImageEncoderViT(nn.Module):
                 x.shape[2] == self.img_size and x.shape[3] == self.img_size
         ), "input image size must match self.img_size"
         # w = Watch()
+        #pdb.set_trace()
         img_original = x
         x = self.patch_embed(x)
+        _, _, ts, ts = x.shape
         # print(f"self.patch_embed = {w.see_seconds()}")
 
         # B C H W -> B H W C
@@ -333,6 +335,18 @@ class ImageEncoderViT(nn.Module):
         x = x + get_abs_pos(
             self.pos_embed, self.pretrain_use_cls_token, [x.shape[1], x.shape[2]]
         )
+
+        B, C, H, W = img_original.shape
+        avg_ds_size = 160
+        kernel_size = (H // avg_ds_size, W // avg_ds_size)
+        img_avg_ds = F.avg_pool2d(img_original, kernel_size=kernel_size)
+        img_avg_ds = F.interpolate(img_avg_ds, size=(avg_ds_size, avg_ds_size), mode='bilinear', align_corners=False)
+        x_ds = self.patch_embed(img_avg_ds)
+        x_ds = x_ds.permute(0, 2, 3, 1)
+        x_ds = x_ds + get_abs_pos(
+            self.pos_embed, self.pretrain_use_cls_token, [x_ds.shape[1], x_ds.shape[2]]
+        )
+        x_ds = x_ds.permute(0, 3, 1, 2)
 
         #####################################################################################################################################
         ################ learning to down sample and pruning ############################
@@ -401,7 +415,7 @@ class ImageEncoderViT(nn.Module):
 
         segSize = 20
         #x, grid = self.segmentation_module(x, batched_points, s_bin_selected_BxHMxWMx1, segSize)
-        x, indices, _, padding_mask = self.segmentation_module(x, img_original, batched_points, s_bin_selected_BxHMxWMx1, segSize)
+        x, indices, _, padding_mask = self.segmentation_module(x, x_ds, img_original, batched_points, s_bin_selected_BxHMxWMx1, segSize)
 
         x = x.permute(0, 2, 1)
 
@@ -413,7 +427,8 @@ class ImageEncoderViT(nn.Module):
         # wang topk_reconstruct
         x = x.permute(0, 2, 1)
         x_flat = x.view(x.shape[0], x.shape[1], -1)
-        full_x = torch.zeros(x.shape[0], x.shape[1], 40*40).to(x.device)
+        #pdb.set_trace()
+        full_x = torch.zeros(x.shape[0], x.shape[1], ts*ts).to(x.device) #TODO change size
         
         # 创建有效索引的掩码（过滤掉-1索引）
         valid_indices_mask = indices >= 0  # [B, max_tokens]
@@ -430,7 +445,7 @@ class ImageEncoderViT(nn.Module):
                 valid_indices_exp = valid_indices.unsqueeze(0).expand(x.shape[1], -1)  # [C, valid_count]
                 full_x[b].scatter_(1, valid_indices_exp, valid_features)
         
-        full_x = full_x.view(full_x.shape[0], -1, 40, 40)
+        full_x = full_x.view(full_x.shape[0], -1, ts, ts)  #TODO size
         #x = x.permute(0, 2, 3, 1)
         # wang topk_reconstruct
 
