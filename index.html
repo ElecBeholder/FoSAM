@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoSAM: Foveated Segment Anything Model</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            background-color: #f5f5f5;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .main-content {
+            margin-bottom: 3rem;
+        }
+        .section {
+            margin-bottom: 2.5rem;
+        }
+        .author {
+            font-style: italic;
+            color: #666;
+        }
+        .badge {
+            margin-right: 0.5rem;
+        }
+        .figure {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+        .figure img {
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .figure-caption {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .table-responsive {
+            margin: 1.5rem 0;
+        }
+        .video-container {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            margin: 1.5rem 0;
+        }
+        .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .citation {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 1.5rem 0;
+            white-space: pre-wrap;
+        }
+        footer {
+            margin-top: 3rem;
+            padding: 2rem 0;
+            background-color: #f5f5f5;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12 text-center">
+                    <h1>FoSAM: Foveated Segment Anything Model</h1>
+                    <p class="lead">A Revolutionary Approach to Efficient Instance Segmentation for AR/VR</p>
+                    <p class="author">David S. Hippocampus - NeurIPS 2025</p>
+                    <div>
+                        <span class="badge bg-primary">AR/VR</span>
+                        <span class="badge bg-primary">Computer Vision</span>
+                        <span class="badge bg-primary">Instance Segmentation</span>
+                        <span class="badge bg-primary">Gaze-based Computing</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container main-content">
+        <section class="section" id="abstract">
+            <h2>Abstract</h2>
+            <p>
+                Augmented Reality (AR) encompasses transformative technologies that are redefining how humans interact with their environment. 
+                A key component of AR is image segmentation, which breaks down the user's front-view scene into distinct regions for analysis. 
+                This process is essential for accurately overlaying digital content onto the physical world by detecting and isolating relevant objects. 
+                However, despite its importance, image segmentation poses significant computational demands and latency issues on AR devices, 
+                which can severely impact the overall user experience. In this paper, we propose <i>Foveated Segment Anything Model</i> (FoSAM), 
+                a framework built upon the Segment Anything Model (SAM) that utilizes real-time gaze data to focus segmentation on regions of interest, 
+                substantially lowering computational cost. Experimental results show that FoSAM reduces computational cost by over 50×, 
+                enabling a seamless visual experience for users, as confirmed by our real-world user study.
+            </p>
+        </section>
+
+        <section class="section" id="demo">
+            <h2>Demo Video</h2>
+            <div class="video-container">
+                <video controls>
+                    <source src="assets/demo.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <p class="figure-caption text-center">FoSAM in action - demonstrating efficient instance segmentation based on user gaze.</p>
+        </section>
+
+        <section class="section" id="framework">
+            <h2>Framework Overview</h2>
+            <div class="figure">
+                <img src="fosam_fig.pdf" alt="FoSAM Framework Architecture" class="img-fluid">
+                <p class="figure-caption">Figure 1: Overview of the FoSAM framework, showing the gaze-guided saliency encoder that enables efficient processing.</p>
+            </div>
+            <p>
+                FoSAM significantly reduces the computational requirements of image segmentation in AR environments by 
+                focusing processing only on areas where the user is looking. The framework leverages natural human eye 
+                behavior to prioritize segmentation on the instance of interest (IOI) while ignoring peripheral regions.
+            </p>
+        </section>
+
+        <section class="section" id="contributions">
+            <h2>Main Contributions</h2>
+            <ol>
+                <li>
+                    <strong>Novel Perspective on Instance Segmentation:</strong> We introduce a new approach to 
+                    segmentation that exploits human eye behavior to reduce computational costs in AR settings.
+                </li>
+                <li>
+                    <strong>Lightweight Segmentation Framework:</strong> FoSAM is built on ESAM and processes 
+                    high-resolution input images while performing instance segmentation on the IOI with extremely 
+                    low computational cost.
+                </li>
+                <li>
+                    <strong>Streaming Algorithm for Real-time Applications:</strong> The FoSAM Streaming Algorithm (FSA) 
+                    exploits temporal continuity across frames and human gaze patterns to optimize segmentation, 
+                    delivering enhanced performance in dynamic AR environments.
+                </li>
+            </ol>
+        </section>
+
+        <section class="section" id="results">
+            <h2>Experimental Results</h2>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>K</th>
+                            <th>ADE20K</th>
+                            <th>LVIS</th>
+                            <th>Cityscape</th>
+                            <th>GFLOP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>SAM-B</td>
+                            <td>4096</td>
+                            <td>0.511</td>
+                            <td>0.537</td>
+                            <td>0.347</td>
+                            <td>744</td>
+                        </tr>
+                        <tr>
+                            <td>ESAM-S</td>
+                            <td>4096</td>
+                            <td>0.411</td>
+                            <td>0.359</td>
+                            <td>0.304</td>
+                            <td>188.2</td>
+                        </tr>
+                        <tr>
+                            <td>ESAM-T</td>
+                            <td>4096</td>
+                            <td>0.350</td>
+                            <td>0.236</td>
+                            <td>0.248</td>
+                            <td>56.1</td>
+                        </tr>
+                        <tr>
+                            <td>SlimSAM-S</td>
+                            <td>4096</td>
+                            <td>0.477</td>
+                            <td>0.474</td>
+                            <td>0.293</td>
+                            <td>15.1</td>
+                        </tr>
+                        <tr>
+                            <td>SlimSAM-T</td>
+                            <td>4096</td>
+                            <td>0.461</td>
+                            <td>0.458</td>
+                            <td>0.263</td>
+                            <td>11.0</td>
+                        </tr>
+                        <tr>
+                            <td>FSNet-DL</td>
+                            <td>NA</td>
+                            <td>0.34</td>
+                            <td>0.38</td>
+                            <td>0.24</td>
+                            <td>18.8</td>
+                        </tr>
+                        <tr>
+                            <td>FSNet-SF</td>
+                            <td>NA</td>
+                            <td>0.33</td>
+                            <td>0.36</td>
+                            <td>0.21</td>
+                            <td>12.6</td>
+                        </tr>
+                        <tr class="table-primary">
+                            <td><strong>FoSAM-S</strong></td>
+                            <td>200</td>
+                            <td><strong>0.495</strong></td>
+                            <td><strong>0.487</strong></td>
+                            <td><strong>0.404</strong></td>
+                            <td><strong>14.6</strong></td>
+                        </tr>
+                        <tr class="table-primary">
+                            <td><strong>FoSAM-S</strong></td>
+                            <td>100</td>
+                            <td><strong>0.465</strong></td>
+                            <td><strong>0.461</strong></td>
+                            <td><strong>0.362</strong></td>
+                            <td><strong>10.4</strong></td>
+                        </tr>
+                        <tr class="table-primary">
+                            <td><strong>FoSAM-T</strong></td>
+                            <td>200</td>
+                            <td><strong>0.471</strong></td>
+                            <td><strong>0.469</strong></td>
+                            <td><strong>0.377</strong></td>
+                            <td><strong>7.4</strong></td>
+                        </tr>
+                        <tr class="table-primary">
+                            <td><strong>FoSAM-T</strong></td>
+                            <td>100</td>
+                            <td><strong>0.457</strong></td>
+                            <td><strong>0.435</strong></td>
+                            <td><strong>0.328</strong></td>
+                            <td><strong>5.3</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>
+                K denotes the token budget. FoSAM consistently outperforms competitive methods while requiring significantly 
+                fewer computational resources.
+            </p>
+
+            <h3>Processing Latency</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Token Budget</th>
+                            <th>Latency (ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>FoSAM-S</td>
+                            <td>200</td>
+                            <td>21.6</td>
+                        </tr>
+                        <tr>
+                            <td>FoSAM-S</td>
+                            <td>100</td>
+                            <td>18.3</td>
+                        </tr>
+                        <tr>
+                            <td>FoSAM-T</td>
+                            <td>200</td>
+                            <td>17.6</td>
+                        </tr>
+                        <tr>
+                            <td>FoSAM-T</td>
+                            <td>100</td>
+                            <td>14.5</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>
+                FoSAM achieves latencies well below the 30ms threshold required for seamless AR experiences.
+            </p>
+        </section>
+
+        <section class="section" id="user-study">
+            <h2>User Study</h2>
+            <p>
+                Our user study involving 7 participants showed that FoSAM was preferred in 96.9%±4.8% of trials 
+                over traditional SAM, demonstrating the real-world benefits of our approach for AR applications.
+            </p>
+        </section>
+
+        <section class="section" id="code">
+            <h2>Code and Paper</h2>
+            <p>
+                <a href="https://github.com/ElecBeholder/FoSAM" class="btn btn-primary">GitHub Repository</a>
+                <a href="#" class="btn btn-secondary">Paper (Coming Soon)</a>
+            </p>
+        </section>
+
+        <section class="section" id="citation">
+            <h2>Citation</h2>
+            <pre class="citation">@inproceedings{fosam2025,
+  title={Foveated Segment Anything Model},
+  author={Hippocampus, David S.},
+  booktitle={Advances in Neural Information Processing Systems},
+  year={2025}
+}</pre>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>© 2024 FoSAM Authors. All rights reserved.</p>
+            <p>
+                <a href="https://github.com/ElecBeholder/FoSAM">GitHub</a> | 
+                <a href="https://github.com/ElecBeholder/FoSAM/blob/main/LICENSE">License</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
