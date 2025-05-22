@@ -12,6 +12,26 @@ A demonstration of FoSAM in User Study:
 
 ![FoSAM Demo](assets/demo.gif)
 
+### comparison 1
+| FoSAM | SAM |
+|-------|-----|
+| ![FoSAM Airplane](assets/airplane_fosam.gif) | ![SAM Airplane](assets/airplane_sam.gif) |
+
+### comparison 2
+| FoSAM | SAM |
+|-------|-----|
+| ![FoSAM Giraffe](assets/giraffe_fosam.gif) | ![SAM Giraffe](assets/giraffe_sam.gif) |
+
+### comparison 3
+| FoSAM | SAM |
+|-------|-----|
+| ![FoSAM Sign](assets/sign_fosam.gif) | ![SAM Sign](assets/sign_sam.gif) |
+
+### comparison 4
+| FoSAM | SAM |
+|-------|-----|
+| ![FoSAM Horse](assets/horse_fosam.gif) | ![SAM Horse](assets/horse_sam.gif) |
+
 ## Framework Overview
 
 ![FoSAM Architecture](assets/fosam_fig.png)

@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 import math
 import traceback
 from typing import Any, List, Tuple, Type
@@ -26,7 +20,6 @@ from utility.watch import watch_time
 from l_sam.forveated_sam.efficient_sam_decoder import MaskDecoder, PromptEncoder
 from l_sam.forveated_sam.efficient_sam_encoder_gaze_patch import ImageEncoderViT
 from l_sam.forveated_sam.two_way_transformer import TwoWayAttentionBlock, TwoWayTransformer
-from DynamicFocus_foveal_seg_classification.models.models_multiGaussian import build_net_compress, build_net_saliency, DeformSegmentationModule
 from config import cfg
 import torchvision.models as models
 
@@ -757,7 +750,14 @@ class FoveatedSam(nn.Module):
         return (x - self.pixel_mean) / self.pixel_std
 
 
-def build_foveated_sam(img_size, encoder_patch_embed_dim, encoder_num_heads, num_multimask_outputs=3, class_num=10, checkpoint_state_dict=None):
+def build_foveated_sam(img_size, 
+                       encoder_patch_embed_dim, 
+                       encoder_num_heads, 
+                       num_multimask_outputs=3, 
+                       class_num=10, 
+                       checkpoint_state_dict=None,
+                       cut_ratio=0.5,
+                       min_tokens=50):
     encoder_patch_size = 16
     encoder_depth = 12
     encoder_mlp_ratio = 4.0
@@ -791,6 +791,8 @@ def build_foveated_sam(img_size, encoder_patch_embed_dim, encoder_num_heads, num
         mlp_ratio=encoder_mlp_ratio,
         neck_dims=encoder_neck_dims,
         act_layer=activation_fn,
+        cut_ratio=cut_ratio,
+        min_tokens=min_tokens,
     )
 
     image_embedding_size = image_encoder.image_embedding_size

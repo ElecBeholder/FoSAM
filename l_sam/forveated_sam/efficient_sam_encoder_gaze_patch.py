@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 import math
 from typing import List, Optional, Tuple, Type
 import pdb
@@ -14,7 +8,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from utility.watch import watch_time, Watch
-from DynamicFocus_foveal_seg_classification.models.models_gaze_patch import build_net_compress, build_net_saliency, DeformSegmentationModule
+from l_sam.forveated_sam.models_saliency_encoder import DeformSegmentationModule
 from config import cfg
 import cv2
 
@@ -142,20 +136,10 @@ class Attention(nn.Module):
         )
         attn = (q @ k.transpose(-2, -1)) * self.scale
 
-        # 应用padding mask
         if padding_mask is not None:
-            # 将padding_mask扩展为[B, 1, 1, N]以便于广播
-            # 注意：attention的形状是[B, num_heads, N, N]
             padding_mask = padding_mask.view(B, 1, 1, N)
-            
-            # 创建掩码矩阵：只有两个token都是非padding时才允许attention
-            # attention_mask的形状是[B, 1, N, N]
             attention_mask = padding_mask * padding_mask.transpose(-2, -1)
-            
-            # 扩展掩码到所有注意力头 [B, num_heads, N, N]
             attention_mask = attention_mask.expand(-1, self.num_heads, -1, -1)
-            
-            # 将掩码应用到注意力分数上
             attn = attn.masked_fill(attention_mask == 0, -1e9)
         
         attn = attn.softmax(dim=-1)
@@ -267,6 +251,8 @@ class ImageEncoderViT(nn.Module):
             mlp_ratio: float,
             neck_dims: List[int],
             act_layer: Type[nn.Module],
+            cut_ratio: float,
+            min_tokens: int,
     ) -> None:
         """
         Args:
@@ -280,7 +266,8 @@ class ImageEncoderViT(nn.Module):
             act_layer (nn.Module): Activation layer.
         """
         super().__init__()
-
+        self.cut_ratio = cut_ratio
+        self.min_tokens = min_tokens
         self.img_size = img_size
         self.image_embedding_size = img_size // ((patch_size if patch_size > 0 else 1))
         self.transformer_output_dim = ([patch_embed_dim] + neck_dims)[-1]
@@ -290,8 +277,6 @@ class ImageEncoderViT(nn.Module):
 
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, patch_embed_dim)
 
-
-        # Initialize absolute positional embedding with pretrain image size.
         num_patches = (pretrain_img_size // patch_size) * (
                 pretrain_img_size // patch_size
         )
@@ -323,14 +308,9 @@ class ImageEncoderViT(nn.Module):
         assert (
                 x.shape[2] == self.img_size and x.shape[3] == self.img_size
         ), "input image size must match self.img_size"
-        # w = Watch()
-        #pdb.set_trace()
         img_original = x
         x = self.patch_embed(x)
         _, _, ts, ts = x.shape
-        # print(f"self.patch_embed = {w.see_seconds()}")
-
-        # B C H W -> B H W C
         x = x.permute(0, 2, 3, 1)
         x = x + get_abs_pos(
             self.pos_embed, self.pretrain_use_cls_token, [x.shape[1], x.shape[2]]
@@ -348,151 +328,39 @@ class ImageEncoderViT(nn.Module):
         )
         x_ds = x_ds.permute(0, 3, 1, 2)
 
-        #####################################################################################################################################
-        ################ learning to down sample and pruning ############################
-        ## pdb.set_trace()
-        #x = x.permute(0, 3, 1, 2)  # B H W C -> B C H W
-
-        ## 新的代码：直接以注视点为中心裁剪出20x20的区域
-        #batch_size, channels, height, width = x.shape
-        #crop_size = 20  # 裁剪大小
-        #
-        ## 获取每个batch中注视点的坐标
-        ## batched_points的维度为[B, 1, 1, 2]，最后一维分别是宽度坐标和高度坐标
-        ## 注意：原始坐标是在原图(640x640)上的像素坐标，需要缩放到当前feature map尺寸
-        ## 原图中坐标[x, y]表示第y行，第x列，原点在左上角
-        #
-        ## 将原始图像坐标(640x640)缩放到feature map尺寸(40x40)
-        #img_size = 640  # 原始图像尺寸
-        #gaze_x = (batched_points[:, 0, 0, 0].float() / img_size) * width
-        #gaze_y = (batched_points[:, 0, 0, 1].float() / img_size) * height
-        #
-        ## 将坐标转为整数
-        #gaze_y = gaze_y.round().long()
-        #gaze_x = gaze_x.round().long()
-        #
-        ## 存储裁剪后的feature map
-        #cropped_x = torch.zeros(batch_size, channels, crop_size, crop_size, device=x.device)
-        #
-        ## 对每个batch进行裁剪
-        #for b in range(batch_size):
-        #    # 计算裁剪区域的起始位置，优先尝试以注视点为中心
-        #    # 但如果靠近边界，则调整位置确保获得完整的20x20区域
-        #    # 并且确保注视点在裁剪区域内
-        #    start_y = min(max(0, gaze_y[b] - crop_size // 2), height - crop_size)
-        #    start_x = min(max(0, gaze_x[b] - crop_size // 2), width - crop_size)
-        #    
-        #    # 确保注视点在裁剪区域内
-        #    if gaze_y[b] < start_y:
-        #        start_y = max(0, gaze_y[b])
-        #    if gaze_y[b] >= start_y + crop_size:
-        #        start_y = max(0, min(gaze_y[b] - crop_size + 1, height - crop_size))
-        #        
-        #    if gaze_x[b] < start_x:
-        #        start_x = max(0, gaze_x[b])
-        #    if gaze_x[b] >= start_x + crop_size:
-        #        start_x = max(0, min(gaze_x[b] - crop_size + 1, width - crop_size))
-        #    
-        #    # 进行裁剪 - 直接取20x20区域，不做填充或部分裁剪
-        #    cropped_x[b] = x[b, :, start_y:start_y+crop_size, start_x:start_x+crop_size]
-        #    
-        ## 将裁剪后的feature map用于后续处理
-        #x = cropped_x
-        #
-        #x = x.permute(0, 2, 3, 1)  # B C H W -> B H W C
-
-        ####################################################################################################################################
-
-        ####################################################################################################################################
-        ############### learning to down sample and pruning ############################
-
-        #pdb.set_trace()
-        #import matplotlib.pyplot as plt
-        #arr = s_bin_selected_BxHMxWMx1[0,0,:,:].cpu().numpy()
-        #plt.imsave('../l_sam_experiment/selectmask.png', arr, cmap='gray')
-
         x = x.permute(0, 3, 1, 2)
 
         segSize = 20
-        #x, grid = self.segmentation_module(x, batched_points, s_bin_selected_BxHMxWMx1, segSize)
-        x, indices, _, padding_mask = self.segmentation_module(x, x_ds, img_original, batched_points, s_bin_selected_BxHMxWMx1, segSize)
+        x, indices, _, padding_mask = self.segmentation_module(x, 
+                                                               x_ds, 
+                                                               img_original, 
+                                                               batched_points, 
+                                                               s_bin_selected_BxHMxWMx1, 
+                                                               segSize, 
+                                                               cut_ratio=self.cut_ratio, 
+                                                               min_tokens=self.min_tokens)
 
         x = x.permute(0, 2, 1)
-
-        ####################################################################################################################################
 
         for blk in self.blocks:
             x = blk(x, None)
 
-        # wang topk_reconstruct
         x = x.permute(0, 2, 1)
         x_flat = x.view(x.shape[0], x.shape[1], -1)
-        #pdb.set_trace()
-        full_x = torch.zeros(x.shape[0], x.shape[1], ts*ts).to(x.device) #TODO change size
+        full_x = torch.zeros(x.shape[0], x.shape[1], ts*ts).to(x.device)
         
-        # 创建有效索引的掩码（过滤掉-1索引）
-        valid_indices_mask = indices >= 0  # [B, max_tokens]
+        valid_indices_mask = indices >= 0
         
-        # 对每个批次单独处理
         for b in range(indices.shape[0]):
-            # 获取当前批次的有效索引
-            valid_mask = valid_indices_mask[b]  # [max_tokens]
-            valid_indices = indices[b, valid_mask]  # [valid_count]
+            valid_mask = valid_indices_mask[b]
+            valid_indices = indices[b, valid_mask]
             
-            # 只使用有效索引进行恢复
-            if valid_indices.numel() > 0:  # 确保有有效索引
-                valid_features = x_flat[b, :, valid_mask]  # [C, valid_count]
-                valid_indices_exp = valid_indices.unsqueeze(0).expand(x.shape[1], -1)  # [C, valid_count]
+            if valid_indices.numel() > 0:
+                valid_features = x_flat[b, :, valid_mask]
+                valid_indices_exp = valid_indices.unsqueeze(0).expand(x.shape[1], -1)
                 full_x[b].scatter_(1, valid_indices_exp, valid_features)
         
-        full_x = full_x.view(full_x.shape[0], -1, ts, ts)  #TODO size
-        #x = x.permute(0, 2, 3, 1)
-        # wang topk_reconstruct
-
-        #x = x.permute(0, 3, 1, 2)
-        #full_x = self.segmentation_module.inverse_grid_sample(output=x, grid=grid, mode='nearest', kernel_size=1, sigma=1.0)
-        #x = x.permute(0, 2, 3, 1)
-
-        ## 新的代码：将20*20的feature map放回到40*40的tensor中，其余部分填充为0
-        #x = x.permute(0, 3, 1, 2)  # B H W C -> B C H W
-        #batch_size, channels, small_h, small_w = x.shape
-        #full_h, full_w = 40, 40  # 恢复到原始大小
-        #
-        ## 创建填充为0的完整feature map
-        #full_x = torch.zeros(batch_size, channels, full_h, full_w, device=x.device)
-        #
-        ## 对每个batch进行处理
-        #for b in range(batch_size):
-        #    # 计算在full_x中的位置
-        #    # 尽量以注视点为中心放置，但优先确保完整放置20x20区域
-        #    # 使用与裁剪相同的坐标转换逻辑
-        #    img_size = 640  # 原始图像尺寸
-        #    center_x = (batched_points[b, 0, 0, 0].float() / img_size) * full_w
-        #    center_y = (batched_points[b, 0, 0, 1].float() / img_size) * full_h
-        #    
-        #    center_y = center_y.round().long()
-        #    center_x = center_x.round().long()
-        #    
-        #    # 计算粘贴区域的起始位置，尽量以注视点为中心
-        #    # 但如果靠近边界，则调整位置确保完整放置
-        #    start_y = min(max(0, center_y - small_h // 2), full_h - small_h)
-        #    start_x = min(max(0, center_x - small_w // 2), full_w - small_w)
-        #    
-        #    # 确保注视点在放置区域内
-        #    if center_y < start_y:
-        #        start_y = max(0, center_y)
-        #    if center_y >= start_y + small_h:
-        #        start_y = max(0, min(center_y - small_h + 1, full_h - small_h))
-        #        
-        #    if center_x < start_x:
-        #        start_x = max(0, center_x)
-        #    if center_x >= start_x + small_w:
-        #        start_x = max(0, min(center_x - small_w + 1, full_w - small_w))
-        #    
-        #    # 将小feature map粘贴到完整feature map中
-        #    full_x[b, :, start_y:start_y+small_h, start_x:start_x+small_w] = x[b]
-        
-        # 应用neck处理
+        full_x = full_x.view(full_x.shape[0], -1, ts, ts)
         x = self.neck(full_x)
         
         return x
