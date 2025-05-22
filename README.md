@@ -65,6 +65,39 @@ FoSAM achieves latencies well below the 30ms threshold required for seamless AR 
 
 Our user study involving 7 participants showed that FoSAM was preferred in 96.9%±4.8% of trials over traditional SAM, demonstrating the real-world benefits of our approach for AR applications.
 
+## Training
+
+To train FoSAM, follow these steps:
+
+1. Install dependencies:
+   ```bash
+   pip install -r req.txt
+   ```
+
+2. Change to the `l_sam` directory:
+   ```bash
+   cd l_sam
+   ```
+   
+3. Change Dataset path in `preset.py`.
+
+4. Run the training script `train_fosam.py`.  
+   This script supports the following arguments:
+
+You can see all arguments and their descriptions by running:
+```bash
+python train_fosam.py --help
+```
+
+### Example usage
+
+Train on LVIS:
+```bash
+python train_fosam.py --mode lvis --batch_size 8 --num_epochs 100 --cut_ratio 0.01 --min_tokens 100
+```
+
+For more details on each argument, please refer to the top of `l_sam/train_fosam.py`.
+
 ## License
 
 [MIT License](LICENSE)

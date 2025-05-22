@@ -1,12 +1,12 @@
 import os
 import platform
 
-dpath_training_records = r'/home/wang/b_data_train/a_records_train'
+dpath_training_records = r'b_data_train/a_records_train'
 
-dpath_data_raw = r'/home/wang/b_data_train/data_a_raw'
-dpath_data_cache = r'/home/wang/b_data_train/data_b_cache'
-dpath_data_cook = r'/home/wang/b_data_train/data_c_cook'
-dpath_esam_weights = r'/home/wang/FoSAM/l_sam/esam_weight'
+dpath_data_raw = r'b_data_train/data_a_raw'
+dpath_data_cache = r'b_data_train/data_b_cache'
+dpath_data_cook = r'b_data_train/data_c_cook'
+dpath_esam_weights = r'FoSAM/l_sam/esam_weight'
 
 dpath_data_raw_cityscape_X = os.path.join(dpath_data_raw, r'leftImg8bit')
 dpath_data_raw_cityscape_Y = os.path.join(dpath_data_raw, r'gtFine')
