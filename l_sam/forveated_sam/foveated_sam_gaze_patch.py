@@ -632,7 +632,7 @@ class FoveatedSam(nn.Module):
 
     # @watch_time
     @torch.jit.export
-    def get_image_embeddings(self, batched_images, batched_points, s_bin_selected_BxHMxWMx1) -> torch.Tensor:
+    def get_image_embeddings(self, batched_images, batched_points, Y_bx1xHxW, Y_cls_bx1) -> torch.Tensor:
         """
         Predicts masks end-to-end from provided images and prompts.
         If prompts are not known in advance, using SamPredictor is
@@ -645,13 +645,15 @@ class FoveatedSam(nn.Module):
           The last embedding corresponds to the final layer.
         """
         batched_images = self.preprocess(batched_images)
-        return self.image_encoder(batched_images, batched_points, s_bin_selected_BxHMxWMx1)
+        return self.image_encoder(batched_images, batched_points, Y_bx1xHxW, Y_cls_bx1)
 
     def forward(
             self,
             batched_images: torch.Tensor,
             batched_points: torch.Tensor,
             batched_point_labels: torch.Tensor,
+            Y_bx1xHxW: torch.Tensor,
+            Y_cls_bx1: torch.Tensor,
             scale_to_original_image_size: bool = True,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -671,9 +673,9 @@ class FoveatedSam(nn.Module):
         """
         batch_size, _, input_h, input_w = batched_images.shape
 
-        s_bin_selected_BxHMxWMx1 = generate_attention_mask(batched_images, batched_points.squeeze(1).squeeze(1), crop_ratio=0.5)
+        #s_bin_selected_BxHMxWMx1 = generate_attention_mask(batched_images, batched_points.squeeze(1).squeeze(1), crop_ratio=0.5)
 
-        image_embeddings = self.get_image_embeddings(batched_images, batched_points, s_bin_selected_BxHMxWMx1)
+        image_embeddings, loss, loss_nll = self.get_image_embeddings(batched_images, batched_points, Y_bx1xHxW, Y_cls_bx1)
 
         masks, iou_pred = self.predict_masks(
             image_embeddings,
@@ -733,7 +735,7 @@ class FoveatedSam(nn.Module):
         cls_pred = self.classifier(fusion_emd, fusion_crop)
 
 
-        return masks, cls_pred, iou_pred
+        return masks, cls_pred, iou_pred, loss, loss_nll
 
     # @watch_time
     def preprocess(self, x: torch.Tensor) -> torch.Tensor:

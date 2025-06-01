@@ -304,7 +304,7 @@ class ImageEncoderViT(nn.Module):
             LayerNorm2d(neck_dims[0]),
         )
 
-    def forward(self, x: torch.Tensor, batched_points, s_bin_selected_BxHMxWMx1) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, batched_points, Y_bx1xHxW, Y_cls_bx1) -> torch.Tensor:
         assert (
                 x.shape[2] == self.img_size and x.shape[3] == self.img_size
         ), "input image size must match self.img_size"
@@ -330,15 +330,13 @@ class ImageEncoderViT(nn.Module):
 
         x = x.permute(0, 3, 1, 2)
 
-        segSize = 20
-        x, indices, _, padding_mask = self.segmentation_module(x, 
-                                                               x_ds, 
-                                                               img_original, 
-                                                               batched_points, 
-                                                               s_bin_selected_BxHMxWMx1, 
-                                                               segSize, 
-                                                               cut_ratio=self.cut_ratio, 
-                                                               min_tokens=self.min_tokens)
+        x, indices, loss, loss_nll = self.segmentation_module(x, 
+                                                        x_ds, 
+                                                        batched_points, 
+                                                        Y_bx1xHxW,
+                                                        Y_cls_bx1,
+                                                        cut_ratio=self.cut_ratio, 
+                                                        min_tokens=self.min_tokens)
 
         x = x.permute(0, 2, 1)
 
@@ -363,4 +361,4 @@ class ImageEncoderViT(nn.Module):
         full_x = full_x.view(full_x.shape[0], -1, ts, ts)
         x = self.neck(full_x)
         
-        return x
+        return x, loss, loss_nll

@@ -109,7 +109,6 @@ def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_t
     
     selected_feature_map = []
     all_indices = []
-    padding_masks = []
     
     feature_flat_BxCxHW = feature_map_BxCxHxW.view(B, C, -1)
     
@@ -120,8 +119,6 @@ def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_t
         indices_exp = indices.unsqueeze(0).expand(C, -1)  # [C, count]
         selected_features = torch.gather(feature_flat_BxCxHW[b], 1, indices_exp)  # [C, count]
         
-        padding_mask = torch.ones(max_tokens, device=indices.device)
-        
         if count < max_tokens:
             feature_padding = torch.zeros(C, max_tokens - count, device=selected_features.device)
             selected_features = torch.cat([selected_features, feature_padding], dim=1)  # [C, max_tokens]
@@ -129,17 +126,13 @@ def dynamic_topk(feature_map_BxCxHxW, saliency_map_BxHxW, cut_ratio=0.005, min_t
             index_padding = torch.full((max_tokens - count,), -1, dtype=indices.dtype, device=indices.device)
             indices = torch.cat([indices, index_padding], dim=0)  # [max_tokens]
             
-            padding_mask[count:] = 0
-        
         selected_feature_map.append(selected_features)
         all_indices.append(indices)
-        padding_masks.append(padding_mask)
     
     selected_feature_map = torch.stack(selected_feature_map, dim=0)  # [B, C, max_tokens]
     all_indices = torch.stack(all_indices, dim=0)  # [B, max_tokens]
-    padding_mask = torch.stack(padding_masks, dim=0)  # [B, max_tokens]
     
-    return selected_feature_map, all_indices, sample_token_counts, padding_mask
+    return selected_feature_map, all_indices, sample_token_counts
 
 class CompressNet(nn.Module):
     def __init__(self):
@@ -155,6 +148,13 @@ class CompressNet(nn.Module):
 class DeformSegmentationModule(nn.Module):
     def __init__(self, cfg):
         super(DeformSegmentationModule, self).__init__()
+
+        self.epsilon = 1e-6
+        self.debug_count = 0
+        self.criterion = nn.CrossEntropyLoss()
+        self.bce_loss = nn.BCEWithLogitsLoss()
+        self.temperature = 0.5
+
         self.backbone = LightweightViT(dim=384, depth=2, heads=3)
         self.grid_size_x = 20
         self.grid_size_y = 20
@@ -179,10 +179,9 @@ class DeformSegmentationModule(nn.Module):
     def forward(self,
                 img_data,
                 img_data_ds,
-                img_original,
                 focus_point,
-                s_bin_selected_BxHMxWMx1=None,
-                segSize=None,
+                Y_bx1xHxW,
+                Y_cls_bx1,
                 cut_ratio=0.5,
                 min_tokens=50):
         batch_size = img_data.shape[0]
@@ -206,8 +205,8 @@ class DeformSegmentationModule(nn.Module):
         x_grid = x_grid.unsqueeze(0).unsqueeze(-1).expand(batch_size, H, W, 1)
         y_grid = y_grid.unsqueeze(0).unsqueeze(-1).expand(batch_size, H, W, 1)
         
-        x_offset = torch.tanh(all_params[:, 0]).view(batch_size, H, W, 1) * 0.1
-        y_offset = torch.tanh(all_params[:, 1]).view(batch_size, H, W, 1) * 0.1
+        x_offset = torch.tanh(all_params[:, 0]).view(batch_size, H, W, 1) * 0.0
+        y_offset = torch.tanh(all_params[:, 1]).view(batch_size, H, W, 1) * 0.0
         
         mu_xs = torch.clamp(x_grid + x_offset, 0, 1)  # [B, H, W, 1]
         mu_ys = torch.clamp(y_grid + y_offset, 0, 1)  # [B, H, W, 1]
@@ -251,7 +250,7 @@ class DeformSegmentationModule(nn.Module):
         self.sigma_ys = sigma_ys
         self.rhos = rhos
         
-        selected_feature_map, indices, sample_token_counts, padding_mask = dynamic_topk(
+        selected_feature_map, indices, sample_token_counts = dynamic_topk(
             img_data, 
             saliency_map_BxHxW.detach(), 
             cut_ratio=cut_ratio,
@@ -259,8 +258,30 @@ class DeformSegmentationModule(nn.Module):
         )
         
         self.token_count_list.append(sample_token_counts.detach().cpu().numpy())
+        
+        cur_Y_bx1xHxW = Y_bx1xHxW[:, :, :, :].to(selected_feature_map.device)
+        B, _, H, W = cur_Y_bx1xHxW.shape
+        ds_factor_h = H // embeddings.shape[1]
+        ds_factor_w = W // embeddings.shape[2]
+        downsampled_mask = F.avg_pool2d(cur_Y_bx1xHxW, kernel_size=(ds_factor_h, ds_factor_w), 
+                                       stride=(ds_factor_h, ds_factor_w))  # [B, 1, H_emb, W_emb]
+        downsampled_mask = downsampled_mask.permute(0, 2, 3, 1)  # [B, H_emb, W_emb, 1]
+        _, _, nll_loss = self.make_prediction(downsampled_mask)
+        all_fg_predictions = self.all_fg_embeddings_predictions
+        sample_losses = []
+        class_label = Y_cls_bx1.squeeze(1).to(downsampled_mask.device)
+        for b in range(B):
+            sample_preds = all_fg_predictions[b]  # Tensor of shape [N, 51]
+            
+            expanded_label = class_label[b].expand(sample_preds.size(0))
 
-        return selected_feature_map, indices, sample_token_counts, padding_mask
+            sample_loss = self.criterion(sample_preds / self.temperature, expanded_label)
+            sample_losses.append(sample_loss)
+        
+        loss = torch.stack(sample_losses).mean()
+        loss_nll = nll_loss.mean()
+
+        return selected_feature_map, indices, loss, loss_nll
 
     def make_prediction(self, mask_downsampled=None):
         batch_size, H, W, _ = mask_downsampled.shape

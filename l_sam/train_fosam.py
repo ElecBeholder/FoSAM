@@ -69,63 +69,9 @@ if device.type == "cuda":
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
-class CalculateLoss(nn.Module):
-    """
-    Calculate overall loss by selecting embeddings based on segmentation mask
-    """
-    def __init__(self, epsilon=1e-6):
-        super(CalculateLoss, self).__init__()
-        self.epsilon = epsilon
-        self.debug_count = 0
-        self.criterion = nn.CrossEntropyLoss()
-        self.bce_loss = nn.BCEWithLogitsLoss()
-        self.temperature = 0.5
-
-    def forward(self, model, mask, class_label, images=None):
-        """
-        Args:
-            model: DeformSegmentationModule model containing embeddings
-            mask: Segmentation mask [B, 1, H, W]
-            class_label: Class labels [B]
-            images: Original images [B, 3, H, W], optional, for visualization
-        Returns:
-            loss: Classification loss
-        """
-        B, _, H, W = mask.shape
-        
-        embeddings = model.image_encoder.segmentation_module.embeddings
-        ds_factor_h = H // embeddings.shape[1]
-        ds_factor_w = W // embeddings.shape[2]
-        ts = embeddings.shape[1]
-        
-        downsampled_mask = F.avg_pool2d(mask, kernel_size=(ds_factor_h, ds_factor_w), 
-                                       stride=(ds_factor_h, ds_factor_w))  # [B, 1, H_emb, W_emb]
-        
-        downsampled_mask = downsampled_mask.permute(0, 2, 3, 1)  # [B, H_emb, W_emb, 1]
-
-        predictions, neg_similarity, nll_loss = model.image_encoder.segmentation_module.make_prediction(downsampled_mask)
-        
-        all_fg_predictions = model.image_encoder.segmentation_module.all_fg_embeddings_predictions
-        all_embeddings_predictions = model.image_encoder.segmentation_module.all_embeddings_predictions
-        
-        sample_losses = []
-        for b in range(B):
-            sample_preds = all_fg_predictions[b]  # Tensor of shape [N, 51]
-            
-            expanded_label = class_label[b].expand(sample_preds.size(0))
-
-            sample_loss = self.criterion(sample_preds / self.temperature, expanded_label)
-            sample_losses.append(sample_loss)
-        
-        loss = torch.stack(sample_losses).mean()
-        
-        loss_nll = nll_loss.mean()
-        
-        return loss, loss_nll
 
 if __name__ == '__main__':
     mode = args.mode
-    calculate_loss = CalculateLoss().to(device)
     diceloss = DiceLoss(mode='multiclass', from_logits=True)
 
     old_state_dict = torch.load(args.model_path)['model']
@@ -252,10 +198,12 @@ if __name__ == '__main__':
                 b, _ = F_bx2.shape
                 input_labels_bx1xN = torch.ones(b, 1, 1).to(device=device, dtype=torch.int64)
 
-                output_masks_bx1x1xHxW, cls_predictions_bx1xK, iou_predictions_bx1x1 = efficientsam_ti_custom(
+                output_masks_bx1x1xHxW, cls_predictions_bx1xK, iou_predictions_bx1x1, embedding_classification_loss, loss_nll = efficientsam_ti_custom(
                     image_bx3xHxW,
                     input_points_bx1xNx2,
                     input_labels_bx1xN,
+                    Y_bx1xHxW,
+                    Y_cls_bx1
                 )
 
                 seg_pred_bx1xHxW = nn.functional.sigmoid(output_masks_bx1x1xHxW[:, 0, :, :, :]).float() - 0.5
@@ -275,8 +223,6 @@ if __name__ == '__main__':
                 Y_bx1xHxW = Y_bx1xHxW[:, :, :, :].to(device=device)
                 seg_miou, seg_fg_iou, seg_bg_iou = evaluate_segmentation(mask_bx1xHxW, Y_bx1xHxW)
 
-                embedding_classification_loss, loss_nll = calculate_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
-                
                 seg_loss = diceloss(pred_bx1KxHxW, label_bxHxW)
                 
                 loss = (args.lambda3 * seg_loss +
@@ -356,14 +302,13 @@ if __name__ == '__main__':
                     b, _ = F_bx2.shape
                     input_labels_bx1xN = torch.ones(b, 1, 1).to(device=device, dtype=torch.int64)
 
-                    output_masks_bx1x1xHxW, cls_predictions_bx1xK, iou_predictions_bx1x1 = efficientsam_ti_custom(
+                    output_masks_bx1x1xHxW, cls_predictions_bx1xK, iou_predictions_bx1x1, embedding_classification_loss, loss_nll = efficientsam_ti_custom(
                         image_bx3xHxW,
                         input_points_bx1xNx2,
                         input_labels_bx1xN,
                     )
                     Y_cls_b = Y_cls_bx1.squeeze(1).to(device=device)
                     cur_Y_bx1xHxW = Y_bx1xHxW[:, :, :, :].to(device=device)
-                    embedding_classification_loss, loss_nll = calculate_loss(efficientsam_ti_custom, cur_Y_bx1xHxW, Y_cls_b, image_bx3xHxW)
                     loss_cls_list.append(embedding_classification_loss.item())
                     loss_nll_list.append(loss_nll.item())
                     
